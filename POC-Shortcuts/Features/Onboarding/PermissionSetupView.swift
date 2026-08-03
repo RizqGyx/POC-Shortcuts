@@ -83,18 +83,62 @@ struct PermissionSetupView: View {
             Section {
                 switch screenTime.detectionState {
                 case .ready(let linked):
-                    Label("\(linked) app(s) detected automatically", systemImage: "checkmark.circle.fill")
+                    Label("\(linked) app(s) indexed — blocked apps can be reopened", systemImage: "checkmark.circle.fill")
                         .foregroundStyle(.green)
                 case .noAppsSelected:
                     Text("Pick some apps first.").foregroundStyle(.secondary)
                 case .unsupportedOS:
                     Label("Requires iOS 26.4 or later", systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)
+                case .needsDataAccess where screenTime.hasDataAccess:
+                    // Entitlement and data access are both in place, yet iOS still returns
+                    // no names. Nothing the user does in this app changes that, so don't
+                    // pretend otherwise.
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("iOS isn't returning app names", systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                        Text("""
+                        Screen Time access is fully granted, but iOS reports no name for your \
+                        blocked apps. Blocking and breaks still work — only reopening the app \
+                        automatically after Save does not.
+
+                        Worth checking: Settings → Screen Time must be switched on for usage \
+                        data to exist at all.
+                        """)
+                        .font(.caption)
+                        Button("Re-pick Apps") { showPicker = true }
+                            .buttonStyle(.bordered)
+
+                        Divider()
+
+                        // The decisive unknown: the shield configuration extension is the
+                        // one process that can read an app's name without any entitlement.
+                        // If it runs, identification is fixable; if it never runs, it is not.
+                        LabeledContent("Shield extension") {
+                            if let last = SharedStore.events.first(where: { $0.process == "ShieldConfiguration" }) {
+                                Text(last.timestamp, style: .relative).foregroundStyle(.green)
+                            } else {
+                                Text("never ran").foregroundStyle(.orange)
+                            }
+                        }
+                        .font(.caption)
+
+                        LabeledContent("Last shielded app") {
+                            Text(SharedStore.lastShieldedApp?.name ?? "none recorded")
+                                .foregroundStyle(SharedStore.lastShieldedApp == nil ? .orange : .green)
+                        }
+                        .font(.caption)
+
+                        Text("Open a blocked app once, come back here, and pull to refresh to update these.")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+
                 case .needsDataAccess:
                     VStack(alignment: .leading, spacing: 8) {
                         Label("Screen Time data access needed", systemImage: "exclamationmark.triangle.fill")
                             .foregroundStyle(.orange)
-                        Text("""
+                        Text(screenTime.lastError ?? """
                         Voyage Focus can block your apps, but can't tell which one you opened, \
                         so it can't reopen it after a break.
                         """)
@@ -103,6 +147,9 @@ struct PermissionSetupView: View {
                             Task { await screenTime.resetAuthorization() }
                         }
                         .buttonStyle(.bordered)
+                        Text("Resetting clears your app selection — old tokens stop working once authorization is revoked.")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
                     }
                 }
             } header: {
@@ -195,18 +242,5 @@ struct PermissionSetupView: View {
         }
     }
 
-    private var statusText: String {
-        if #available(iOS 26.4, *), screenTime.authorizationStatus == .approvedWithDataAccess {
-            return "Approved + data access"
-        }
-        switch screenTime.authorizationStatus {
-        case .approved:      return "Approved"
-        case .denied:        return "Denied"
-        case .notDetermined: return "Not requested"
-        // Plain `default` rather than `@unknown default`: `.approvedWithDataAccess` is
-        // handled above under an availability check, which the compiler cannot see as
-        // covering the case here.
-        default:             return "Unknown"
-        }
-    }
+    private var statusText: String { screenTime.statusDescription }
 }

@@ -4,6 +4,15 @@
 <dict>
 	<key>com.apple.developer.family-controls</key>
 	<true/>
+	<!--
+	  Separate capability from Family Controls, and the one that gates FamilyActivityData.
+	  Without it the sandbox refuses the XPC lookup for
+	  com.apple.FamilyControlsAgent.data-access, which surfaces as the misleading
+	  "Couldn't communicate with a helper application" (NSCocoaErrorDomain 4099, error 159).
+	  Must also be enabled on the App ID in the Developer Portal.
+	-->
+	<key>com.apple.developer.family-controls.app-and-website-usage</key>
+	<true/>
 	<key>com.apple.security.application-groups</key>
 	<array>
 		<string>group.com.ILC6.Miracle.POC-Shortcuts</string>

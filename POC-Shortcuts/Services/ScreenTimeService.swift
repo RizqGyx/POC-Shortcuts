@@ -74,66 +74,212 @@ final class ScreenTimeService: ObservableObject {
         var isReady: Bool { if case .ready = self { return true }; return false }
     }
 
-    @Published private(set) var lastAutoLinkCount = 0
-
+    /// Ready means: there is a token→app catalogue for the shield's token to be looked up
+    /// in when a break starts. It deliberately does *not* require the picker's tokens to
+    /// resolve — those come from a different namespace than `FamilyActivityData`, so
+    /// insisting on them reported failure while everything needed was already in place.
     var detectionState: DetectionState {
         guard #available(iOS 26.4, *) else { return .unsupportedOS }
         guard selectedAppCount > 0 else { return .noAppsSelected }
-        guard unmappedAppCount == 0 else { return .needsDataAccess }
-        return .ready(linked: selectedAppCount - unmappedAppCount)
+        let catalogue = SharedStore.tokenInfo.count
+        return catalogue > 0 ? .ready(linked: catalogue) : .needsDataAccess
     }
 
     /// The only way to change an existing Screen Time grant is to drop it and ask again —
     /// `requestAuthorization` is a no-op once authorization exists, so a user stuck on plain
     /// `.approved` cannot upgrade to `.approvedWithDataAccess` without this.
+    ///
+    /// Revoking invalidates every `ApplicationToken` issued under the old grant. Keeping the
+    /// old selection around leaves tokens that name nothing and shield nothing, so the
+    /// selection is cleared deliberately and the user is asked to pick again.
     func resetAuthorization() async {
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             AuthorizationCenter.shared.revokeAuthorization { _ in continuation.resume() }
         }
         refreshAuthorizationStatus()
-        SharedStore.log("App", "Screen Time authorization revoked — requesting again.")
+
+        clearShield()
+        selection = FamilyActivitySelection()
+        SharedStore.selectionData = nil
+        SharedStore.tokenInfo = [:]
+        SharedStore.log("App", "Authorization revoked — cleared selection, old tokens are now invalid.")
+
         await requestAuthorization()
+
+        // The agent needs a moment after a fresh grant before it will answer.
+        try? await Task.sleep(for: .seconds(1))
         await autoLinkSelectedApps(force: true)
+    }
+
+    /// A readable label for a bundle identifier when iOS withholds the display name.
+    /// Falls back to the last path component, so `com.burbn.instagram` reads as "Instagram".
+    static func displayName(forBundleID bundleID: String) -> String {
+        if let known = AppLaunchService.catalog.first(where: { $0.bundleID == bundleID }) {
+            return known.name
+        }
+        let tail = bundleID.split(separator: ".").last.map(String.init) ?? bundleID
+        return tail.prefix(1).uppercased() + tail.dropFirst()
+    }
+
+    /// No catalogue at all — nothing for a shield token to resolve against.
+    var selectionLooksStale: Bool {
+        selectedAppCount > 0 && SharedStore.tokenInfo.isEmpty
     }
 
     // MARK: - Installed apps  [REAL on iOS 26.4+, otherwise genuinely impossible]
 
     @Published private(set) var installedApps: [(name: String, bundleID: String)] = []
 
-    /// Links every selected token to a real app, with no user involvement.
+    /// Builds the token→app catalogue the shield's token is looked up in at break time.
     ///
-    /// This is the whole point of `FamilyActivityData`: it returns `Application` values that
-    /// carry a token *and* a bundle identifier *and* a display name, so the tokens the user
-    /// picked can be matched against it directly.
+    /// Two sources:
     ///
-    /// There is deliberately no manual fallback anywhere in the app. Asking the user to
-    /// match tokens to apps was both tedious and unsafe — they could pick YouTube while
-    /// actually opening Instagram, and the wrong app would be reopened.
+    /// 1. **`selection.applications`** — the picker's own `Application` values. Observed to
+    ///    return nil names on device even with data access granted, so it contributes
+    ///    nothing in practice, but it costs one loop and needs no permission.
+    /// 2. **`FamilyActivityData.installedApplications`** — every installed app, with names,
+    ///    bundle IDs and tokens. This is the one that works.
+    ///
+    /// Note what is deliberately *not* required: that the picker's tokens appear in source 2.
+    /// They do not — the two APIs issue different token values for the same app. Requiring
+    /// that intersection made the catalogue look empty when it was in fact complete.
+    ///
+    /// There is no manual fallback. Asking the user to match tokens to apps was both tedious
+    /// and unsafe — they could pick YouTube while actually opening Instagram.
     @discardableResult
     func autoLinkSelectedApps(force: Bool = false) async -> Int {
-        guard #available(iOS 26.4, *) else { return 0 }
-        if force { catalogLoadedAt = nil }
+        guard #available(iOS 26.4, *) else {
+            SharedStore.log("App", "Auto-link skipped: needs iOS 26.4.")
+            return 0
+        }
+        // Throttled: the foreground refresh calls this on every activation.
+        if !force, let loaded = catalogLoadedAt, Date().timeIntervalSince(loaded) < 300 { return 0 }
+        catalogLoadedAt = Date()
+
         let tokens = selection.applicationTokens
         guard !tokens.isEmpty else { return 0 }
 
-        do {
-            let apps = try await FamilyActivityData.shared.installedApplications
-            var linked = 0
-            for app in apps {
-                guard let token = app.token, tokens.contains(token),
-                      let key = TokenBox.key(for: token),
-                      let name = app.localizedDisplayName else { continue }
-                SharedStore.recordTokenInfo(key: key, name: name, bundleID: app.bundleIdentifier)
-                linked += 1
+        var linked = 0
+
+        // Source 1 — straight from the picker's selection.
+        for app in selection.applications {
+            guard let token = app.token, let key = TokenBox.key(for: token) else { continue }
+            guard app.localizedDisplayName != nil || app.bundleIdentifier != nil else { continue }
+            let name = app.localizedDisplayName
+                ?? app.bundleIdentifier.flatMap(Self.displayName(forBundleID:))
+                ?? "Unknown app"
+            SharedStore.recordTokenInfo(key: key, name: name, bundleID: app.bundleIdentifier)
+            linked += 1
+        }
+        SharedStore.log("App", "Auto-link source 1 (selection.applications): \(linked)/\(tokens.count) named.")
+
+        // Source 2 — index *every* installed app, not just the selected ones.
+        //
+        // The earlier version only recorded apps whose token appeared in the selection, and
+        // that intersection is empty: `FamilyActivityData` and `FamilyActivityPicker` do not
+        // hand out the same token values, so `tokens.contains(token)` never matched and the
+        // whole catalogue was thrown away.
+        //
+        // Matching the selection was never the point. What matters is the token the *shield*
+        // hands us at break time, and indexing all 88 apps gives that lookup a chance to hit
+        // regardless of which namespace the selection happens to use.
+        if linked < tokens.count {
+            do {
+                let installed = try await fetchInstalledApplications()
+                let withTokens = installed.filter { $0.token != nil }.count
+
+                var indexed = 0
+                var matchedSelection = 0
+                var withNames = 0
+                var withBundleIDs = 0
+                var keyable = 0
+
+                for app in installed {
+                    if app.localizedDisplayName != nil { withNames += 1 }
+                    if app.bundleIdentifier != nil { withBundleIDs += 1 }
+
+                    guard let token = app.token, let key = TokenBox.key(for: token) else { continue }
+                    keyable += 1
+
+                    // A bundle identifier alone is enough — it is what `AppLaunchService`
+                    // prefers anyway. Requiring a display name as well threw away every
+                    // usable entry, because `localizedDisplayName` is nil in this process
+                    // by design; only extensions get it.
+                    guard app.localizedDisplayName != nil || app.bundleIdentifier != nil else { continue }
+                    let name = app.localizedDisplayName
+                        ?? app.bundleIdentifier.flatMap(Self.displayName(forBundleID:))
+                        ?? "Unknown app"
+
+                    SharedStore.recordTokenInfo(key: key, name: name, bundleID: app.bundleIdentifier)
+                    indexed += 1
+                    if tokens.contains(token) { matchedSelection += 1 }
+                }
+
+                SharedStore.log("App", "Auto-link source 2 (FamilyActivityData): \(installed.count) app(s) — tokens:\(withTokens) names:\(withNames) bundleIDs:\(withBundleIDs) keyable:\(keyable) indexed:\(indexed).")
+                SharedStore.log("App", "Selection tokens also present in that catalogue: \(matchedSelection)/\(tokens.count) — if 0, the picker and FamilyActivityData use different token values.")
+                linked = max(linked, indexed)
+                lastError = nil
+            } catch {
+                lastError = explain(error)
+                SharedStore.log("App", "FamilyActivityData FAILED (status: \(authorizationStatus)): \(error)")
             }
-            lastError = nil
-            SharedStore.log("App", "Auto-linked \(linked) of \(tokens.count) selected app(s).")
-            objectWillChange.send()
-            return linked
-        } catch {
-            lastError = "Automatic linking unavailable: \(error.localizedDescription)"
-            SharedStore.log("App", "autoLinkSelectedApps FAILED: \(error)")
-            return 0
+        }
+
+        SharedStore.log("App", "Auto-link result: \(linked) of \(tokens.count) selected app(s) identified.")
+        objectWillChange.send()
+        return linked
+    }
+
+    /// `FamilyActivityData` talks to `com.apple.ManagedSettingsAgent` over XPC, and that
+    /// connection fails intermittently across the whole Screen Time stack — the same
+    /// "Couldn't communicate with a helper application" turns up on
+    /// `DeviceActivityCenter.startMonitoring`, where retrying after a second is the
+    /// established workaround. Worth two retries before believing it.
+    @available(iOS 26.4, *)
+    private func fetchInstalledApplications() async throws -> [Application] {
+        var lastFailure: Error?
+        for attempt in 1...3 {
+            do {
+                return try await FamilyActivityData.shared.installedApplications
+            } catch {
+                lastFailure = error
+                SharedStore.log("App", "FamilyActivityData attempt \(attempt)/3 failed: \(error.localizedDescription)")
+                if attempt < 3 { try? await Task.sleep(for: .seconds(1)) }
+            }
+        }
+        throw lastFailure ?? FamilyControlsError.unavailable
+    }
+
+    /// The raw XPC message is misleading — "Couldn't communicate with a helper application"
+    /// reads like a transient glitch, but the underlying failure is
+    /// `error 159 - Sandbox restriction` on a lookup of
+    /// `com.apple.FamilyControlsAgent.data-access`, which means an entitlement is missing
+    /// rather than anything being temporarily unavailable.
+    private func explain(_ error: Error) -> String {
+        let nsError = error as NSError
+        let sandboxBlocked = nsError.code == 4099
+            || nsError.localizedDescription.contains("helper application")
+
+        if sandboxBlocked {
+            return """
+            Missing the "Family Controls App and Website Usage" capability. Enable \
+            com.apple.developer.family-controls.app-and-website-usage on this App ID in the \
+            Developer Portal, then re-download provisioning profiles. Screen Time is \
+            currently "\(statusDescription)".
+            """
+        }
+        return "Automatic detection unavailable: \(error.localizedDescription)"
+    }
+
+    var statusDescription: String {
+        if #available(iOS 26.4, *), authorizationStatus == .approvedWithDataAccess {
+            return "Approved + data access"
+        }
+        switch authorizationStatus {
+        case .approved:      return "Approved"
+        case .denied:        return "Denied"
+        case .notDetermined: return "Not requested"
+        default:             return "Unknown"
         }
     }
 
@@ -169,18 +315,6 @@ final class ScreenTimeService: ObservableObject {
 
     private var catalogLoadedAt: Date?
 
-    /// Keeps the token→app map warm so a shield tap can be identified immediately.
-    ///
-    /// This exists because the shield configuration extension turned out to be an
-    /// unreliable source: `Application.token` is nil there, and iOS caches shield
-    /// configurations so the extension may not run again after the first display.
-    func refreshAppCatalogIfPossible(force: Bool = false) async {
-        guard #available(iOS 26.4, *) else { return }
-        if !force, let loaded = catalogLoadedAt, Date().timeIntervalSince(loaded) < 300 { return }
-        catalogLoadedAt = Date()
-        await autoLinkSelectedApps()
-    }
-
     // MARK: - Selection  [REAL]
 
     var selectedAppCount: Int { selection.applicationTokens.count }
@@ -200,7 +334,14 @@ final class ScreenTimeService: ObservableObject {
         SharedStore.selectionData = try? JSONEncoder().encode(selection)
         SharedStore.log("App", "Selected \(selection.applicationTokens.count) app(s) to shield.")
         if SharedStore.isWorkModeActive { applyShield() }
-        Task { await autoLinkSelectedApps() }
+        Task {
+            // Fresh tokens are not always resolvable in the same instant they are minted.
+            await autoLinkSelectedApps(force: true)
+            if selectionLooksStale {
+                try? await Task.sleep(for: .seconds(1))
+                await autoLinkSelectedApps(force: true)
+            }
+        }
     }
 
     private func loadSelection() {

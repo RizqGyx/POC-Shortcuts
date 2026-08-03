@@ -49,7 +49,7 @@ final class AppState: ObservableObject {
 
         // Keep the token→app map fresh so the *next* shield tap can be identified without
         // depending on the shield configuration extension having run.
-        Task { await ScreenTimeService.shared.refreshAppCatalogIfPossible() }
+        Task { await ScreenTimeService.shared.autoLinkSelectedApps() }
     }
 
     /// The shield action extension often cannot name the app it was invoked for: the token

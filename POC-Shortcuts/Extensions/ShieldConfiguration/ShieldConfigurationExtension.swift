@@ -19,15 +19,21 @@ import ManagedSettingsUI
 /// so this remains the reliable path and the only one available below 26.4.
 class ShieldConfigurationExtension: ShieldConfigurationDataSource {
 
+    /// Prints what this extension can actually see onto the shield itself.
+    ///
+    /// This process has no console you can attach to and — if the App Group is not reachable —
+    /// no way to leave a note for the app either. The shield's own subtitle is the one
+    /// channel that always works, so it doubles as the diagnostic surface. Set to `false`
+    /// once the answer is known.
+    private static let showDiagnostics = true
+
     override func configuration(shielding application: Application) -> ShieldConfiguration {
-        let name = capture(application)
-        return shield(for: name)
+        shield(for: capture(application), application: application)
     }
 
     override func configuration(shielding application: Application,
                                 in category: ActivityCategory) -> ShieldConfiguration {
-        let name = capture(application)
-        return shield(for: name)
+        shield(for: capture(application), application: application)
     }
 
     override func configuration(shielding webDomain: WebDomain) -> ShieldConfiguration {
@@ -68,28 +74,36 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         return name
     }
 
-    private func shield(for name: String) -> ShieldConfiguration {
+    /// What this process can and cannot see, rendered onto the shield.
+    private func diagnosticLine(_ application: Application?) -> String {
+        let group = AppGroup.isShared ? "group:ok" : "group:FAIL"
+        let displayName = application?.localizedDisplayName.map { "name:\($0)" } ?? "name:nil"
+        let bundle = application?.bundleIdentifier.map { "id:\($0)" } ?? "id:nil"
+        let token = application?.token == nil ? "token:nil" : "token:ok"
+        return "\(group) · \(displayName) · \(bundle) · \(token)"
+    }
+
+    private func shield(for name: String, application: Application? = nil) -> ShieldConfiguration {
         let blur: UIBlurEffect.Style = .systemUltraThinMaterialDark
         let background = UIColor.black.withAlphaComponent(0.55)
         let icon = UIImage(systemName: "sailboat.fill")
         let title = ShieldConfiguration.Label(text: "Voyage Focus", color: .white)
+        var subtitleText = "Work Mode is on.\nYou're trying to open \(name)."
+        if Self.showDiagnostics {
+            subtitleText += "\n\n\(diagnosticLine(application))"
+        }
         let subtitle = ShieldConfiguration.Label(
-            text: "Work Mode is on.\nYou're trying to open \(name).",
+            text: subtitleText,
             color: UIColor.white.withAlphaComponent(0.85)
         )
         let primary = ShieldConfiguration.Label(text: "Take a break", color: .black)
 
-        // A single button, by design.
+        // One button. "Take a break" opens Voyage Focus, where the duration and the context
+        // note are collected, and the blocked app is reopened after Save.
         //
-        // iOS 26.4 also allows a submenu on the secondary button (up to three items, each
-        // reported back as its own ShieldAction case), which can grant a break without ever
-        // opening the app. That was removed here because two entry points doing almost the
-        // same thing made the flow confusing, and because a submenu item is only a String —
-        // it cannot capture a context note, and a break granted from the extension cannot
-        // start a Live Activity (ActivityKit requires a foregrounded app).
-        //
-        // The handlers for those submenu cases still exist in ShieldActionExtension, so
-        // re-enabling this is a one-line change if the quick path is ever wanted back.
+        // The iOS 26.4 submenu (`secondaryButtonSubmenuItems`) is deliberately not used: it
+        // grants a break from inside this extension, which means no context note and no
+        // Live Activity, and it is a second way of doing the same thing.
         return ShieldConfiguration(
             backgroundBlurStyle: blur,
             backgroundColor: background,

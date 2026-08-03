@@ -18,11 +18,11 @@ import UserNotifications
 /// The shield can now hand the user straight to us. The pre-26.5 notification path is kept
 /// below as a fallback, since the deployment target is iOS 17.
 ///
-/// ## Two routes out of the shield
+/// ## One route out of the shield
 ///
-/// * **Primary button** → open the app, collect duration *and* free-text context.
-/// * **Secondary button submenu** (iOS 26.4+) → pick a duration right on the shield and go
-///   straight to the app. Faster, but a submenu item is only a `String`, so no context note.
+/// The primary button opens Voyage Focus, where the duration and context note are collected.
+/// Reopening the blocked app afterwards needs its identity — see `resolveIdentity`, which is
+/// the one part of this flow that depends on iOS being willing to name the app.
 class ShieldActionExtension: ShieldActionDelegate {
 
     private let store = ManagedSettingsStore(named: .voyageFocus)
@@ -60,17 +60,12 @@ class ShieldActionExtension: ShieldActionDelegate {
             SharedStore.log("ShieldAction", "Secondary button on \"\(name)\".")
             completionHandler(.close)
 
-        case .firstSecondarySubmenuItemPressed:
-            grantQuickBreak(minutes: BreakDurations.minutes(atSubmenuIndex: 0), token: application,
-                            key: key, name: name, completionHandler: completionHandler)
-
-        case .secondSecondarySubmenuItemPressed:
-            grantQuickBreak(minutes: BreakDurations.minutes(atSubmenuIndex: 1), token: application,
-                            key: key, name: name, completionHandler: completionHandler)
-
-        case .thirdSecondarySubmenuItemPressed:
-            grantQuickBreak(minutes: BreakDurations.minutes(atSubmenuIndex: 2), token: application,
-                            key: key, name: name, completionHandler: completionHandler)
+        // The shield offers no submenu, so these never fire. Still required for the switch
+        // to be exhaustive.
+        case .firstSecondarySubmenuItemPressed,
+             .secondSecondarySubmenuItemPressed,
+             .thirdSecondarySubmenuItemPressed:
+            completionHandler(.close)
 
         @unknown default:
             completionHandler(.close)
@@ -124,56 +119,6 @@ class ShieldActionExtension: ShieldActionDelegate {
 
         SharedStore.log("ShieldAction", "Could NOT identify the app — Application(token:) gave nil, token map empty, no shield record.")
         return ("an app", nil)
-    }
-
-    // MARK: - Quick break, granted without ever leaving the shield
-
-    /// Lifts the shield from inside the extension, then asks the system to re-evaluate.
-    /// `.defer` is the documented way to say "I changed the ManagedSettingsStore, look
-    /// again" — the shield finds this app no longer shielded and lets it through.
-    private func grantQuickBreak(minutes: Int,
-                                 token: ApplicationToken,
-                                 key: String?,
-                                 name: String,
-                                 completionHandler: @escaping (ShieldActionResponse) -> Void) {
-
-        let request = BreakRequest(appName: name, appTokenKey: key, source: .screenTimeShield)
-        let grant = BreakGrant(
-            request: request,
-            durationMinutes: minutes,
-            contextNote: "Quick break (chosen on the shield)"
-        )
-        SharedStore.activeGrant = grant
-        SharedStore.clearPendingRequest()
-
-        var shielded = store.shield.applications ?? []
-        shielded.remove(token)
-        store.shield.applications = shielded.isEmpty ? nil : shielded
-
-        armReshield(token: token, minutes: minutes)
-
-        SharedStore.log("ShieldAction", "Quick break: \(minutes) min for \"\(name)\" — shield lifted from the extension.")
-        completionHandler(.defer)
-    }
-
-    /// Best effort from inside the extension. `AppState` re-checks expiry on every
-    /// foreground regardless, because threshold callbacks are not dependable.
-    private func armReshield(token: ApplicationToken, minutes: Int) {
-        let center = DeviceActivityCenter()
-        center.stopMonitoring([.breakWindow])
-
-        let schedule = DeviceActivitySchedule(
-            intervalStart: DateComponents(hour: 0, minute: 0),
-            intervalEnd: DateComponents(hour: 23, minute: 59),
-            repeats: true
-        )
-        let event = DeviceActivityEvent(applications: [token], threshold: DateComponents(minute: minutes))
-
-        do {
-            try center.startMonitoring(.breakWindow, during: schedule, events: [.breakUsageLimit: event])
-        } catch {
-            SharedStore.log("ShieldAction", "Could not arm re-shield from extension: \(error)")
-        }
     }
 
     /// Pre-iOS 26.5 fallback: the only channel this process had to reach the user.

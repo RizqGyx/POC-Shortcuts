@@ -14,10 +14,19 @@ enum AppGroup {
     /// The app's own URL scheme, used for deep links back into the break screen.
     static let urlScheme = "voyagefocus"
 
+    /// Whether this process can reach the shared container at all.
+    ///
+    /// Worth checking explicitly: when the App Group is missing from a target's
+    /// *provisioning profile* — as opposed to its entitlements file — `UserDefaults(suiteName:)`
+    /// can still hand back a usable object whose writes simply never reach the other
+    /// processes. Nothing throws, nothing logs, and the data silently goes nowhere.
+    static var isShared: Bool {
+        UserDefaults(suiteName: identifier) != nil
+    }
+
     static var defaults: UserDefaults {
         guard let defaults = UserDefaults(suiteName: identifier) else {
-            // Almost always means the App Group is missing from this target's entitlements.
-            assertionFailure("App Group \(identifier) unavailable — check entitlements.")
+            NSLog("[VoyageFocus] App Group \(identifier) unavailable — check this target's provisioning profile.")
             return .standard
         }
         return defaults
