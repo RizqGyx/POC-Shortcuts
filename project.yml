@@ -1,0 +1,105 @@
+name: POC-Shortcuts
+options:
+  bundleIdPrefix: com.ILC6.Miracle
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+settings:
+  base:
+    DEVELOPMENT_TEAM: H37C5FSRQW
+    SWIFT_VERSION: "5.0"
+    CODE_SIGN_STYLE: Automatic
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    TARGETED_DEVICE_FAMILY: "1"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    GENERATE_INFOPLIST_FILE: NO
+
+targets:
+  POC-Shortcuts:
+    type: application
+    platform: iOS
+    sources:
+      - path: POC-Shortcuts
+        excludes:
+          - "Extensions/**"
+          - "Widgets/**"
+    dependencies:
+      - target: ShieldConfigurationExtension
+      - target: ShieldActionExtension
+      - target: DeviceActivityMonitorExtension
+      - target: VoyageFocusWidgets
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ILC6.Miracle.POC-Shortcuts
+        PRODUCT_NAME: POC-Shortcuts
+        INFOPLIST_FILE: POC-Shortcuts/Resources/Info.plist
+        CODE_SIGN_ENTITLEMENTS: POC-Shortcuts/Resources/POC-Shortcuts.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+
+  ShieldConfigurationExtension:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: POC-Shortcuts/Extensions/ShieldConfiguration
+      - path: POC-Shortcuts/Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ILC6.Miracle.POC-Shortcuts.ShieldConfiguration
+        PRODUCT_NAME: ShieldConfigurationExtension
+        INFOPLIST_FILE: POC-Shortcuts/Extensions/ShieldConfiguration/Info.plist
+        CODE_SIGN_ENTITLEMENTS: POC-Shortcuts/Extensions/ShieldConfiguration/ShieldConfigurationExtension.entitlements
+
+  ShieldActionExtension:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: POC-Shortcuts/Extensions/ShieldAction
+      - path: POC-Shortcuts/Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ILC6.Miracle.POC-Shortcuts.ShieldAction
+        PRODUCT_NAME: ShieldActionExtension
+        INFOPLIST_FILE: POC-Shortcuts/Extensions/ShieldAction/Info.plist
+        CODE_SIGN_ENTITLEMENTS: POC-Shortcuts/Extensions/ShieldAction/ShieldActionExtension.entitlements
+
+  DeviceActivityMonitorExtension:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: POC-Shortcuts/Extensions/DeviceActivityMonitor
+      - path: POC-Shortcuts/Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ILC6.Miracle.POC-Shortcuts.Monitor
+        PRODUCT_NAME: DeviceActivityMonitorExtension
+        INFOPLIST_FILE: POC-Shortcuts/Extensions/DeviceActivityMonitor/Info.plist
+        CODE_SIGN_ENTITLEMENTS: POC-Shortcuts/Extensions/DeviceActivityMonitor/DeviceActivityMonitorExtension.entitlements
+
+  # Live Activities are rendered by a widget extension. This target needs the App Group
+  # (to read the active grant) but not Family Controls — it never touches Screen Time.
+  VoyageFocusWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: POC-Shortcuts/Widgets
+      - path: POC-Shortcuts/Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ILC6.Miracle.POC-Shortcuts.Widgets
+        PRODUCT_NAME: VoyageFocusWidgets
+        INFOPLIST_FILE: POC-Shortcuts/Widgets/Info.plist
+        CODE_SIGN_ENTITLEMENTS: POC-Shortcuts/Widgets/VoyageFocusWidgets.entitlements
+
+schemes:
+  POC-Shortcuts:
+    build:
+      targets:
+        POC-Shortcuts: all
+    run:
+      config: Debug
+    archive:
+      config: Release
