@@ -64,17 +64,82 @@ final class ScreenTimeService: ObservableObject {
         }
     }
 
+    /// Why automatic app detection isn't working, if it isn't. Drives the setup UI.
+    enum DetectionState {
+        case ready(linked: Int)
+        case needsDataAccess
+        case unsupportedOS
+        case noAppsSelected
+
+        var isReady: Bool { if case .ready = self { return true }; return false }
+    }
+
+    @Published private(set) var lastAutoLinkCount = 0
+
+    var detectionState: DetectionState {
+        guard #available(iOS 26.4, *) else { return .unsupportedOS }
+        guard selectedAppCount > 0 else { return .noAppsSelected }
+        guard unmappedAppCount == 0 else { return .needsDataAccess }
+        return .ready(linked: selectedAppCount - unmappedAppCount)
+    }
+
+    /// The only way to change an existing Screen Time grant is to drop it and ask again —
+    /// `requestAuthorization` is a no-op once authorization exists, so a user stuck on plain
+    /// `.approved` cannot upgrade to `.approvedWithDataAccess` without this.
+    func resetAuthorization() async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            AuthorizationCenter.shared.revokeAuthorization { _ in continuation.resume() }
+        }
+        refreshAuthorizationStatus()
+        SharedStore.log("App", "Screen Time authorization revoked — requesting again.")
+        await requestAuthorization()
+        await autoLinkSelectedApps(force: true)
+    }
+
     // MARK: - Installed apps  [REAL on iOS 26.4+, otherwise genuinely impossible]
 
     @Published private(set) var installedApps: [(name: String, bundleID: String)] = []
 
-    /// iOS 26.4 introduced `FamilyActivityData`, which hands back real `Application`
-    /// values — with `bundleIdentifier` and `localizedDisplayName` populated — instead of
-    /// opaque tokens.
+    /// Links every selected token to a real app, with no user involvement.
     ///
-    /// Before 26.4 this was flatly impossible outside the shield configuration extension,
-    /// and every app in this category shipped a hand-maintained name→scheme table as a
-    /// workaround. That workaround is still in `AppLaunchService` as the pre-26.4 fallback.
+    /// This is the whole point of `FamilyActivityData`: it returns `Application` values that
+    /// carry a token *and* a bundle identifier *and* a display name, so the tokens the user
+    /// picked can be matched against it directly.
+    ///
+    /// There is deliberately no manual fallback anywhere in the app. Asking the user to
+    /// match tokens to apps was both tedious and unsafe — they could pick YouTube while
+    /// actually opening Instagram, and the wrong app would be reopened.
+    @discardableResult
+    func autoLinkSelectedApps(force: Bool = false) async -> Int {
+        guard #available(iOS 26.4, *) else { return 0 }
+        if force { catalogLoadedAt = nil }
+        let tokens = selection.applicationTokens
+        guard !tokens.isEmpty else { return 0 }
+
+        do {
+            let apps = try await FamilyActivityData.shared.installedApplications
+            var linked = 0
+            for app in apps {
+                guard let token = app.token, tokens.contains(token),
+                      let key = TokenBox.key(for: token),
+                      let name = app.localizedDisplayName else { continue }
+                SharedStore.recordTokenInfo(key: key, name: name, bundleID: app.bundleIdentifier)
+                linked += 1
+            }
+            lastError = nil
+            SharedStore.log("App", "Auto-linked \(linked) of \(tokens.count) selected app(s).")
+            objectWillChange.send()
+            return linked
+        } catch {
+            lastError = "Automatic linking unavailable: \(error.localizedDescription)"
+            SharedStore.log("App", "autoLinkSelectedApps FAILED: \(error)")
+            return 0
+        }
+    }
+
+    /// Note: deliberately *not* gated on `hasDataAccess`. Whether plain `.approved` is
+    /// enough for `FamilyActivityData` is undocumented, so we attempt the call and let the
+    /// framework decide, rather than refusing based on a guess.
     func loadInstalledApps() async {
         guard #available(iOS 26.4, *) else {
             lastError = "Installed-app listing requires iOS 26.4 or later."
@@ -109,21 +174,33 @@ final class ScreenTimeService: ObservableObject {
     /// This exists because the shield configuration extension turned out to be an
     /// unreliable source: `Application.token` is nil there, and iOS caches shield
     /// configurations so the extension may not run again after the first display.
-    func refreshAppCatalogIfPossible() async {
-        guard hasDataAccess else { return }
-        if let loaded = catalogLoadedAt, Date().timeIntervalSince(loaded) < 300 { return }
+    func refreshAppCatalogIfPossible(force: Bool = false) async {
+        guard #available(iOS 26.4, *) else { return }
+        if !force, let loaded = catalogLoadedAt, Date().timeIntervalSince(loaded) < 300 { return }
         catalogLoadedAt = Date()
-        await loadInstalledApps()
+        await autoLinkSelectedApps()
     }
 
     // MARK: - Selection  [REAL]
 
     var selectedAppCount: Int { selection.applicationTokens.count }
 
+    /// Blocked apps with no identity at all, so nothing can be derived for reopening them.
+    /// An app that is named but absent from the scheme catalog does not count here — a
+    /// scheme is guessed from its name, which works for most apps.
+    var unmappedAppCount: Int {
+        selection.applicationTokens.reduce(into: 0) { count, token in
+            guard let key = TokenBox.key(for: token) else { return }
+            let info = SharedStore.info(forTokenKey: key)
+            if info?.bundleID == nil && info?.name == nil { count += 1 }
+        }
+    }
+
     func persistSelection() {
         SharedStore.selectionData = try? JSONEncoder().encode(selection)
         SharedStore.log("App", "Selected \(selection.applicationTokens.count) app(s) to shield.")
         if SharedStore.isWorkModeActive { applyShield() }
+        Task { await autoLinkSelectedApps() }
     }
 
     private func loadSelection() {

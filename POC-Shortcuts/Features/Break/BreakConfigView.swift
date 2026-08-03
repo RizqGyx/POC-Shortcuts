@@ -13,21 +13,13 @@ struct BreakConfigView: View {
     @EnvironmentObject private var state: AppState
     @Environment(\.dismiss) private var dismiss
 
-    /// Set only when iOS refused to identify the app and the user picked it themselves.
-    @State private var manualPick: AppLaunchService.Known?
-
-    /// The request actually saved — `request` plus any manual correction.
-    private var effective: BreakRequest {
-        var resolved = request
-        if let manualPick {
-            resolved.appName = manualPick.name
-            resolved.appBundleID = manualPick.bundleID
-        }
-        return resolved
-    }
+    /// The app is identified before this screen ever appears — the token→app link is made
+    /// once during setup. Asking here would be both an extra step and unsafe: the user could
+    /// pick YouTube while actually opening Instagram, and we would reopen the wrong app.
+    private var effective: BreakRequest { request }
 
     private var unresolved: Bool {
-        AppLaunchService.isUnresolved(name: effective.appName, bundleID: effective.appBundleID)
+        AppLaunchService.isUnresolved(name: request.appName, bundleID: request.appBundleID)
     }
 
     @State private var minutes = BreakDurations.options[1]
@@ -46,6 +38,11 @@ struct BreakConfigView: View {
                          ? "You're about to open a blocked app."
                          : "You're about to open \(effective.appName).")
                         .foregroundStyle(.secondary)
+                    if unresolved {
+                        Text("iOS didn't identify this app, so it can't be reopened automatically. Your break still applies to every blocked app.")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    }
                 } footer: {
                     HStack {
                         Text("Intercepted via \(request.source.displayName)")
@@ -55,30 +52,6 @@ struct BreakConfigView: View {
                         )
                     }
                     .font(.caption2)
-                }
-
-                if unresolved {
-                    Section {
-                        Picker("App", selection: $manualPick) {
-                            Text("Choose…").tag(nil as AppLaunchService.Known?)
-                            ForEach(AppLaunchService.catalog) { app in
-                                Text(app.name).tag(app as AppLaunchService.Known?)
-                            }
-                        }
-                    } header: {
-                        HStack {
-                            Text("Which app?")
-                            Spacer()
-                            CapabilityBadge(capability: .partial, note: "iOS didn't say")
-                        }
-                    } footer: {
-                        Text("""
-                        iOS did not identify the app this time. The shield extension gets a \
-                        token with no name attached, and `Application.token` is nil in the one \
-                        extension that *can* read names — so there is nothing to resolve. \
-                        Picking here lets the return-to-app step still work.
-                        """)
-                    }
                 }
 
                 Section("How long?") {
@@ -121,8 +94,8 @@ struct BreakConfigView: View {
                 } footer: {
                     Text("""
                     Saving writes {requestedApp, breakDuration, context} into the shared \
-                    App Group container, lifts the Screen Time shield on \(request.appName), \
-                    arms the re-block, and then opens \(request.appName) by its URL scheme.
+                    App Group container, lifts the Screen Time shield on every blocked app, \
+                    arms the re-block, and reopens the app you came from by its URL scheme.
                     """)
                 }
             }

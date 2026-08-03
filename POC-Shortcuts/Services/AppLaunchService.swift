@@ -18,6 +18,8 @@ enum AppLaunchService {
         var id: String { bundleID }
     }
 
+    /// Only apps whose scheme cannot be guessed from their name need an entry here.
+    /// Everything else is derived — see `derivedScheme(from:)`.
     static let catalog: [Known] = [
         Known(name: "Instagram", bundleID: "com.burbn.instagram",      scheme: "instagram://"),
         Known(name: "TikTok",    bundleID: "com.zhiliaoapp.musically", scheme: "tiktok://"),
@@ -29,7 +31,24 @@ enum AppLaunchService {
         Known(name: "Snapchat",  bundleID: "com.toyopagroup.picaboo",  scheme: "snapchat://"),
         Known(name: "Netflix",   bundleID: "com.netflix.Netflix",      scheme: "nflx://"),
         Known(name: "Spotify",   bundleID: "com.spotify.client",       scheme: "spotify://"),
+        Known(name: "Messages",  bundleID: "com.apple.MobileSMS",      scheme: "sms://"),
+        Known(name: "Mail",      bundleID: "com.apple.mobilemail",     scheme: "message://"),
+        Known(name: "Safari",    bundleID: "com.apple.mobilesafari",   scheme: "http://apple.com"),
+        Known(name: "Music",     bundleID: "com.apple.Music",          scheme: "music://"),
+        Known(name: "Gmail",     bundleID: "com.google.Gmail",         scheme: "googlegmail://"),
+        Known(name: "Threads",   bundleID: "com.burbn.barcelona",      scheme: "barcelona://"),
+        Known(name: "Pinterest", bundleID: "pinterest",                scheme: "pinterest://"),
     ]
+
+    /// Most apps register a scheme that is simply their name in lowercase — `discord://`,
+    /// `linkedin://`, `telegram://`, `slack://`. Guessing it removes the need to enumerate
+    /// every app on the App Store, and a wrong guess is harmless: `UIApplication.open`
+    /// reports failure rather than throwing, so we just fall back.
+    static func derivedScheme(from name: String) -> String? {
+        let compact = name.lowercased().filter { $0.isLetter || $0.isNumber }
+        guard compact.count >= 2 else { return nil }
+        return "\(compact)://"
+    }
 
     /// Names iOS gives us when it declines to identify the app. Treat as "unknown", never
     /// as something to match against.
@@ -39,6 +58,7 @@ enum AppLaunchService {
         scheme(for: name, bundleID: bundleID) == nil
     }
 
+    /// Resolution order: exact bundle ID → exact name → derived from name.
     static func scheme(for appName: String, bundleID: String? = nil) -> String? {
         if let bundleID, let hit = catalog.first(where: { $0.bundleID == bundleID }) {
             return hit.scheme
@@ -46,7 +66,8 @@ enum AppLaunchService {
         let needle = appName.lowercased().trimmingCharacters(in: .whitespaces)
         guard !placeholderNames.contains(needle) else { return nil }
         if let exact = catalog.first(where: { $0.name.lowercased() == needle }) { return exact.scheme }
-        return catalog.first(where: { needle.contains($0.name.lowercased()) })?.scheme
+        if let partial = catalog.first(where: { needle.contains($0.name.lowercased()) }) { return partial.scheme }
+        return derivedScheme(from: appName)
     }
 
     enum Outcome: Equatable {

@@ -46,6 +46,28 @@ struct DiagnosticsView: View {
                 """)
             }
 
+            Section {
+                ForEach(["ShieldConfiguration", "ShieldAction", "DeviceActivityMonitor"], id: \.self) { process in
+                    LabeledContent(process) {
+                        if let last = events.first(where: { $0.process == process }) {
+                            Text(last.timestamp, style: .relative).foregroundStyle(.green)
+                        } else {
+                            Text("never ran").foregroundStyle(.orange)
+                        }
+                    }
+                    .font(.caption)
+                }
+            } header: {
+                Text("Extension heartbeat")
+            } footer: {
+                Text("""
+                Extensions run in their own processes and don't appear in Xcode's console \
+                when it is attached to the app, so "never ran" here is the only reliable \
+                signal that one isn't being invoked — iOS caches shield configurations, so \
+                ShieldConfiguration in particular may not run on every block.
+                """)
+            }
+
             Section("Context payload (App Group)") {
                 if let grant = SharedStore.activeGrant {
                     Text(json(grant))

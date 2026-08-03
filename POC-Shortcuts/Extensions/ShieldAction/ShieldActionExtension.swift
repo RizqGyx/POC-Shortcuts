@@ -32,14 +32,9 @@ class ShieldActionExtension: ShieldActionDelegate {
                          completionHandler: @escaping (ShieldActionResponse) -> Void) {
 
         let key = TokenBox.key(for: application)
-
-        // Resolution order matters. The token map is usually empty, because
-        // `Application.token` is nil inside the shield *configuration* extension and that is
-        // the only process that can read display names. The record it leaves behind is what
-        // actually identifies the app.
-        let lastSeen = SharedStore.lastShieldedApp
-        let name = SharedStore.displayName(forTokenKey: key) ?? lastSeen?.name ?? "an app"
-        let bundleID = lastSeen?.bundleID
+        let identity = resolveIdentity(token: application, key: key)
+        let name = identity.name
+        let bundleID = identity.bundleID
 
         switch action {
         case .primaryButtonPressed:
@@ -92,6 +87,43 @@ class ShieldActionExtension: ShieldActionDelegate {
                          for category: ActivityCategoryToken,
                          completionHandler: @escaping (ShieldActionResponse) -> Void) {
         completionHandler(.close)
+    }
+
+    // MARK: - Working out which app this actually is
+
+    /// Four sources, cheapest and most universal first. Each attempt is logged with the
+    /// source that won, so the Diagnostics timeline shows which one is doing the work on a
+    /// given device instead of leaving it to guesswork.
+    ///
+    /// 1. `Application(token:)` — costs nothing, needs no permission, works from iOS 15.
+    ///    Documented as nil *outside* an extension; this is inside one, so it is worth
+    ///    asking. If it populates, no linking or iOS 26.4 is needed at all.
+    /// 2. The token map, filled by the app from `FamilyActivityData` (iOS 26.4+).
+    /// 3. Whatever the shield configuration extension last recorded — same second, but only
+    ///    if iOS actually re-ran that extension rather than serving a cached shield.
+    /// 4. Give up; the app shows an unlinked warning rather than reopening the wrong thing.
+    private func resolveIdentity(token: ApplicationToken,
+                                 key: String?) -> (name: String, bundleID: String?) {
+
+        let direct = Application(token: token)
+        if let name = direct.localizedDisplayName {
+            SharedStore.log("ShieldAction", "Identified \"\(name)\" via Application(token:) — no linking needed.")
+            if let key { SharedStore.recordTokenInfo(key: key, name: name, bundleID: direct.bundleIdentifier) }
+            return (name, direct.bundleIdentifier)
+        }
+
+        if let info = SharedStore.info(forTokenKey: key), let name = info.name as String? {
+            SharedStore.log("ShieldAction", "Identified \"\(name)\" via token map (FamilyActivityData).")
+            return (name, info.bundleID)
+        }
+
+        if let last = SharedStore.lastShieldedApp {
+            SharedStore.log("ShieldAction", "Identified \"\(last.name)\" via last shielded app record.")
+            return (last.name, last.bundleID)
+        }
+
+        SharedStore.log("ShieldAction", "Could NOT identify the app — Application(token:) gave nil, token map empty, no shield record.")
+        return ("an app", nil)
     }
 
     // MARK: - Quick break, granted without ever leaving the shield

@@ -1,7 +1,11 @@
 import SwiftUI
 import FamilyControls
 
-/// Setup is deliberately two required steps: grant Screen Time, pick apps.
+/// Setup is two required steps: grant Screen Time, pick apps.
+///
+/// App identity is resolved automatically via FamilyActivityData — there is no manual
+/// linking step anywhere in the app. Step 3 only reports whether that succeeded, and offers
+/// the one action that can fix it when it hasn't.
 ///
 /// Nothing about Shortcuts appears here on a current device. That matches how Jomo, Opal
 /// and ClearSpace behave — they are pure Screen Time API apps and never ask the user to
@@ -16,6 +20,8 @@ struct PermissionSetupView: View {
     @State private var notificationsRequested = false
 
     private var authorized: Bool { screenTime.isAuthorized }
+    /// Linking is part of being ready, not an optional extra. If a token has no identity,
+    /// the break flow cannot reopen that app and the user hits a dead end mid-break.
     private var ready: Bool { authorized && screenTime.selectedAppCount > 0 }
 
     var body: some View {
@@ -70,10 +76,50 @@ struct PermissionSetupView: View {
                     CapabilityBadge(capability: .real)
                 }
             } footer: {
-                Text("Apple's own picker. That's the whole setup — you're ready after this.")
+                Text("Apple's own picker. That's the whole setup — Voyage Focus works out app identities on its own from here.")
             }
 
-            // 3 ── optional ────────────────────────────────────────────────
+            // 3 ── automatic, nothing for the user to do ──────────────────
+            Section {
+                switch screenTime.detectionState {
+                case .ready(let linked):
+                    Label("\(linked) app(s) detected automatically", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                case .noAppsSelected:
+                    Text("Pick some apps first.").foregroundStyle(.secondary)
+                case .unsupportedOS:
+                    Label("Requires iOS 26.4 or later", systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                case .needsDataAccess:
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Screen Time data access needed", systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                        Text("""
+                        Voyage Focus can block your apps, but can't tell which one you opened, \
+                        so it can't reopen it after a break.
+                        """)
+                        .font(.caption)
+                        Button("Reset Screen Time Access") {
+                            Task { await screenTime.resetAuthorization() }
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
+            } header: {
+                HStack {
+                    Text("3. App Detection")
+                    Spacer()
+                    CapabilityBadge(capability: .real, note: "automatic")
+                }
+            } footer: {
+                Text("""
+                Handled entirely by the app through FamilyActivityData — there is nothing to \
+                configure. Granting authorization again is the only way to add data access, \
+                because iOS ignores a repeat request while a grant already exists.
+                """)
+            }
+
+            // 4 ── optional ────────────────────────────────────────────────
             Section {
                 Button("Allow Notifications") {
                     Task {
@@ -86,8 +132,8 @@ struct PermissionSetupView: View {
                 }
             } header: {
                 HStack {
-                    Text(PlatformCapabilities.shieldCanOpenApp ? "3. Notifications (optional)"
-                                                               : "3. Notifications (required)")
+                    Text(PlatformCapabilities.shieldCanOpenApp ? "4. Notifications (optional)"
+                                                               : "4. Notifications (required)")
                     Spacer()
                     CapabilityBadge(capability: .real)
                 }
@@ -112,7 +158,7 @@ struct PermissionSetupView: View {
                     NavigationLink("Set Up the Automation") { AutomationGuideView() }
                 } header: {
                     HStack {
-                        Text("4. Shortcuts (older iOS only)")
+                        Text("5. Shortcuts (older iOS only)")
                         Spacer()
                         CapabilityBadge(capability: .partial, note: "manual")
                     }
@@ -130,7 +176,9 @@ struct PermissionSetupView: View {
                     .disabled(!ready)
             } footer: {
                 if !ready {
-                    Text("Grant Screen Time access and pick at least one app to continue.")
+                    Text(screenTime.unmappedAppCount > 0
+                         ? "Link your blocked apps so Voyage Focus can reopen them after a break."
+                         : "Grant Screen Time access and pick at least one app to continue.")
                         .font(.caption)
                 }
             }
@@ -139,7 +187,11 @@ struct PermissionSetupView: View {
         .navigationBarTitleDisplayMode(.inline)
         .familyActivityPicker(isPresented: $showPicker, selection: $screenTime.selection)
         .onChange(of: showPicker) { _, isShowing in
-            if !isShowing { screenTime.persistSelection() }
+            guard !isShowing else { return }
+            screenTime.persistSelection()
+            // Resolve names automatically first; only surface the screen if anything is
+            // still unidentified.
+            Task { await screenTime.autoLinkSelectedApps(force: true) }
         }
     }
 
