@@ -36,8 +36,26 @@ class ShieldActionExtension: ShieldActionDelegate {
         let name = identity.name
         let bundleID = identity.bundleID
 
+        // The primary button always means the same thing.
+        //
+        // It used to branch on `SharedStore.breakEnded` so the shield could offer "Start
+        // Work" after a break expired. That desynchronised badly: iOS caches the rendered
+        // shield, so ShieldConfiguration kept drawing "Take a break" while this extension
+        // read the newer flag and ran the "Start Work" branch — the button said one thing
+        // and did another, closing the shield and dropping the user on the Home Screen.
+        //
+        // A shield whose appearance cannot be refreshed must not have state-dependent
+        // behaviour. The break-is-over choice lives in the Live Activity instead, which
+        // does update.
+        // A shield being tapped means no break is running, so any leftover countdown is
+        // stale. This is often the first process to run after one expires.
+        if SharedStore.activeGrant == nil {
+            LiveActivityService.end(from: "ShieldAction")
+        }
+
         switch action {
         case .primaryButtonPressed:
+            SharedStore.breakEnded = nil
             SharedStore.pendingRequest = BreakRequest(
                 appName: name,
                 appTokenKey: key,
@@ -54,20 +72,10 @@ class ShieldActionExtension: ShieldActionDelegate {
                 completionHandler(.close)
             }
 
-        case .secondaryButtonPressed:
-            // With submenu items attached, this is just the menu opening — nothing to do.
-            // Pre-26.4 it is the plain "Stay focused" button.
-            SharedStore.log("ShieldAction", "Secondary button on \"\(name)\".")
-            completionHandler(.close)
-
-        // The shield offers no submenu, so these never fire. Still required for the switch
-        // to be exhaustive.
-        case .firstSecondarySubmenuItemPressed,
-             .secondSecondarySubmenuItemPressed,
-             .thirdSecondarySubmenuItemPressed:
-            completionHandler(.close)
-
-        @unknown default:
+        default:
+            // Includes the secondary button in its normal state, and the submenu cases the
+            // shield never presents.
+            SharedStore.log("ShieldAction", "Dismissed shield for \"\(name)\".")
             completionHandler(.close)
         }
     }

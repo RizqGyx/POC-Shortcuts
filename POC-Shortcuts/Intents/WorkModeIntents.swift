@@ -55,7 +55,7 @@ struct EndBreakIntent: AppIntent {
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let name = SharedStore.activeGrant?.appName
-        ScreenTimeService.shared.revokeExpiredGrant(reason: "ended early via Shortcuts")
+        ScreenTimeService.shared.revokeExpiredGrant(reason: "ended early via Shortcuts", expired: false)
         NotificationCenter.default.post(name: .voyageFocusSharedStateChanged, object: nil)
         return .result(dialog: name.map { "Break from \($0) ended." } ?? "No break was active.")
     }

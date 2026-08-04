@@ -22,7 +22,7 @@ struct BreakConfigView: View {
         AppLaunchService.isUnresolved(name: request.appName, bundleID: request.appBundleID)
     }
 
-    @State private var minutes = BreakDurations.options[1]
+    @State private var seconds = BreakDurations.options[3]
     @State private var contextNote = ""
     @State private var isSaving = false
 
@@ -54,13 +54,55 @@ struct BreakConfigView: View {
                     .font(.caption2)
                 }
 
-                Section("How long?") {
-                    Picker("Duration", selection: $minutes) {
+                Section {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3),
+                              spacing: 8) {
                         ForEach(BreakDurations.options, id: \.self) { option in
-                            Text("\(option) min").tag(option)
+                            Button {
+                                seconds = option
+                            } label: {
+                                Text(BreakDurations.label(option))
+                                    .font(.subheadline)
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(seconds == option ? .accentColor : .secondary)
                         }
                     }
-                    .pickerStyle(.segmented)
+
+                    Stepper(
+                        value: Binding(
+                            get: { seconds },
+                            set: { seconds = BreakDurations.clamp($0) }
+                        ),
+                        in: BreakDurations.range,
+                        step: BreakDurations.step(for: seconds)
+                    ) {
+                        HStack {
+                            Text("Duration")
+                            Spacer()
+                            Text(BreakDurations.label(seconds))
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                        }
+                    }
+                } header: {
+                    HStack {
+                        Text("How long?")
+                        Spacer()
+                        if seconds < BreakDurations.developmentCeiling {
+                            CapabilityBadge(capability: .partial, note: "dev length")
+                        }
+                    }
+                } footer: {
+                    if seconds < BreakDurations.developmentCeiling {
+                        Text("""
+                        Under a minute is for testing the expiry path quickly. The usage-based \
+                        re-block can't be armed below one minute — DeviceActivity thresholds \
+                        are whole minutes — so a break this short relies on the wall-clock \
+                        trigger alone.
+                        """)
+                    }
                 }
 
                 Section("What's the context?") {
@@ -77,7 +119,7 @@ struct BreakConfigView: View {
                         let pending = effective
                         // Commit, close the sheet, *then* launch. See AppState for why the
                         // launch cannot happen in the same breath as the unshield.
-                        state.commitBreak(request: pending, minutes: minutes, context: contextNote)
+                        state.commitBreak(request: pending, seconds: seconds, context: contextNote)
                         dismiss()
                         Task {
                             await state.openRequestedApp(pending)

@@ -39,7 +39,7 @@ struct BreakGrant: Codable, Equatable, Identifiable {
     var appName: String
     var appTokenKey: String?
     var appBundleID: String?
-    var durationMinutes: Int
+    var durationSeconds: Int
     var contextNote: String
     var grantedAt: Date
     var expiresAt: Date
@@ -47,14 +47,14 @@ struct BreakGrant: Codable, Equatable, Identifiable {
     var isActive: Bool { Date() < expiresAt }
     var remaining: TimeInterval { max(0, expiresAt.timeIntervalSinceNow) }
 
-    init(request: BreakRequest, durationMinutes: Int, contextNote: String, now: Date = Date()) {
+    init(request: BreakRequest, durationSeconds: Int, contextNote: String, now: Date = Date()) {
         self.appName = request.appName
         self.appTokenKey = request.appTokenKey
         self.appBundleID = request.appBundleID
-        self.durationMinutes = durationMinutes
+        self.durationSeconds = durationSeconds
         self.contextNote = contextNote
         self.grantedAt = now
-        self.expiresAt = now.addingTimeInterval(TimeInterval(durationMinutes * 60))
+        self.expiresAt = now.addingTimeInterval(TimeInterval(durationSeconds))
     }
 }
 
@@ -77,4 +77,11 @@ struct ShieldedAppInfo: Codable, Equatable {
     var name: String
     var bundleID: String?
     var seenAt: Date = Date()
+}
+
+/// Recorded the moment a break runs out, so the next shield can react to it.
+struct BreakEndedInfo: Codable, Equatable {
+    var appName: String
+    var durationSeconds: Int
+    var endedAt: Date = Date()
 }

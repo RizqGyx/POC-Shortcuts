@@ -11,6 +11,7 @@
 		089E8F82577DFED7FC4717FA /* DeviceActivityNames.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92CC9D980632C045A5F45952 /* DeviceActivityNames.swift */; };
 		0A8D6DE5A23FCDCD2E009732 /* PlatformCapabilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5578A5626CEFD9208D702EE /* PlatformCapabilities.swift */; };
 		132BCD09F8FC4952D50C4A3A /* BreakActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECA041411E7A78ABB22ECD01 /* BreakActivityAttributes.swift */; };
+		160EEE79894F6DADF6F448D8 /* BreakControlIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = C410CD528D621608BB7AD044 /* BreakControlIntents.swift */; };
 		167D1F85E33E76F571BA492A /* TokenBox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C72BC8B346E2D51FF39B27D /* TokenBox.swift */; };
 		1A2F28B2F0F0AA2EEF1AE566 /* VoyageFocusWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE03A328BF0BD61C7FE920F8 /* VoyageFocusWidgetBundle.swift */; };
 		1A8E5510F93F43A6FF10D20D /* VoyageFocusApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62BCE335C72A072664B04FA0 /* VoyageFocusApp.swift */; };
@@ -24,10 +25,10 @@
 		3536987157775D5041E6C73A /* PlatformCapabilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5578A5626CEFD9208D702EE /* PlatformCapabilities.swift */; };
 		36707BEF0D4BB3AA7501C2E8 /* BreakActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECA041411E7A78ABB22ECD01 /* BreakActivityAttributes.swift */; };
 		38798CC3A92471D28721E76C /* SharedStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65469964FAA694A598EEE580 /* SharedStore.swift */; };
+		45117EF0DD03155B15622605 /* LiveActivityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C94F40E45159B5A8C5F362 /* LiveActivityService.swift */; };
 		473EECF2C29B7F8ECAD5B82C /* AppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F714C9122D9EB1CE47C533A /* AppGroup.swift */; };
 		4B334B4A412FA8F17F898CB6 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = B02DEAF0625AE987DEDFC4FE /* Models.swift */; };
 		4C9981DB85B9E218427D8E69 /* ShieldConfigurationExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = F07771A74FC60C9FEE7F0E8A /* ShieldConfigurationExtension.swift */; };
-		4FD1E114D04A2F8B755D9EAC /* LiveActivityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49B0EC6457495111F80E493D /* LiveActivityService.swift */; };
 		5172E9930D32C6B8C2F22590 /* ShieldActionExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 40B4879D1982ABB6CC432797 /* ShieldActionExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		542D6A61598F882CF83BF699 /* DeviceActivityMonitorExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 5CEEE9422000F413A5D4E275 /* DeviceActivityMonitorExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		55740F63FB22AC02B3D7A711 /* PermissionSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE384E987F145AD88C9552ED /* PermissionSetupView.swift */; };
@@ -36,13 +37,16 @@
 		66C9C71517CCBDADC2C3C626 /* WorkModeIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5903829530722AF20F4AADAA /* WorkModeIntents.swift */; };
 		6F3010D277CAFF185F5C6426 /* ScreenTimeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7437D0BC7CEF11F61BA9ED17 /* ScreenTimeService.swift */; };
 		707299E998B5494BD4CB40BA /* DeviceActivityNames.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92CC9D980632C045A5F45952 /* DeviceActivityNames.swift */; };
+		71410AA47E99B5981FCC59C3 /* LiveActivityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C94F40E45159B5A8C5F362 /* LiveActivityService.swift */; };
 		71C2972FA68DBA8BF9D8874E /* AppLaunchService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDFACC8D8EF40EBA0F3DAF9E /* AppLaunchService.swift */; };
+		720506C921D9A302AF619F4E /* LiveActivityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C94F40E45159B5A8C5F362 /* LiveActivityService.swift */; };
 		7CA5D2B03D99CEE953F82497 /* BreakDurations.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3D7BE17993D33A8BEC2635B /* BreakDurations.swift */; };
 		7D2E7333AB45FE1C07EFF7FE /* ShieldConfigurationExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 74F14073048D86A78761DC2B /* ShieldConfigurationExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		88483DE67EC22938F34812A4 /* PlatformCapabilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5578A5626CEFD9208D702EE /* PlatformCapabilities.swift */; };
 		8B56CA5A66E40C7769D63143 /* BreakActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECA041411E7A78ABB22ECD01 /* BreakActivityAttributes.swift */; };
 		8E062E8204A06120F326857D /* AppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F714C9122D9EB1CE47C533A /* AppGroup.swift */; };
 		8E6CF6A2C0251017F8793902 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = B02DEAF0625AE987DEDFC4FE /* Models.swift */; };
+		8FB107B5FF62B8BE50C13C78 /* BreakControlIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = C410CD528D621608BB7AD044 /* BreakControlIntents.swift */; };
 		91F2B2FFCB72BBE6960D594B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CBDD2C141E8485BEDAFB8890 /* Assets.xcassets */; };
 		925ED14B4672C03BC9FF4B5A /* AppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F714C9122D9EB1CE47C533A /* AppGroup.swift */; };
 		9480834B7D1213BFAB27D5E0 /* TokenBox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C72BC8B346E2D51FF39B27D /* TokenBox.swift */; };
@@ -55,11 +59,14 @@
 		B958DAABA455A94FCAEF006D /* DeviceActivityNames.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92CC9D980632C045A5F45952 /* DeviceActivityNames.swift */; };
 		BBC1002397D8690B24364892 /* AppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F714C9122D9EB1CE47C533A /* AppGroup.swift */; };
 		C1526907C7075C6199FA6758 /* DeviceActivityNames.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92CC9D980632C045A5F45952 /* DeviceActivityNames.swift */; };
+		C5DD2912ED345F17964904C9 /* BreakControlIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = C410CD528D621608BB7AD044 /* BreakControlIntents.swift */; };
 		C683172BCE4296DED5A0ACD6 /* BreakDurations.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3D7BE17993D33A8BEC2635B /* BreakDurations.swift */; };
 		CA1D63329A229B037188255B /* TokenBox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C72BC8B346E2D51FF39B27D /* TokenBox.swift */; };
+		CAD6161BCF33585D58A7B466 /* BreakControlIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = C410CD528D621608BB7AD044 /* BreakControlIntents.swift */; };
 		CD7733574C9ECC3BADAAC159 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = B02DEAF0625AE987DEDFC4FE /* Models.swift */; };
 		CF69CF12546A09A2468771E7 /* VoyageFocusShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 089E5D8FD705646B97117E9A /* VoyageFocusShortcuts.swift */; };
 		D1E93E1BE40136853DC93AA6 /* PlatformCapabilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5578A5626CEFD9208D702EE /* PlatformCapabilities.swift */; };
+		D1F7CFE6E9F65F9B4BDBF0E0 /* LiveActivityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C94F40E45159B5A8C5F362 /* LiveActivityService.swift */; };
 		D9F5AE509257DC4552DA846C /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = B02DEAF0625AE987DEDFC4FE /* Models.swift */; };
 		DAF740372DE9C0853B9EEA43 /* StartBreakIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95062CFC9A6DD9F318BF8EBF /* StartBreakIntent.swift */; };
 		DCF0186C7580BD5D6EE823A8 /* VoyageFocusWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AC28E088D5219B3E8A8E8478 /* VoyageFocusWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -68,6 +75,8 @@
 		E365AB3EBCFA11A53C4BECAD /* BreakActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECA041411E7A78ABB22ECD01 /* BreakActivityAttributes.swift */; };
 		E3C20C1B79C553D788F6D32E /* DeviceActivityNames.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92CC9D980632C045A5F45952 /* DeviceActivityNames.swift */; };
 		E57A99240B4BF2FFCDF722E5 /* PlatformCapabilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5578A5626CEFD9208D702EE /* PlatformCapabilities.swift */; };
+		E8F25998473626E6532388DA /* LiveActivityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C94F40E45159B5A8C5F362 /* LiveActivityService.swift */; };
+		EC62545AA8026F1265AD096C /* BreakControlIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = C410CD528D621608BB7AD044 /* BreakControlIntents.swift */; };
 		EC992D5E42798F70EAD3FC88 /* AutomationGuideView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49E51DC84AC189169AA2B578 /* AutomationGuideView.swift */; };
 		F18917CD5C85686724FC5BFE /* BreakDurations.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3D7BE17993D33A8BEC2635B /* BreakDurations.swift */; };
 		F2BE599C9F127DB10676EC59 /* SharedStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65469964FAA694A598EEE580 /* SharedStore.swift */; };
@@ -128,8 +137,8 @@
 		0E247399FC6689A9015EFBB1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		324F06FBBF1C5FA18470261D /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		40B4879D1982ABB6CC432797 /* ShieldActionExtension.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = ShieldActionExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
-		49B0EC6457495111F80E493D /* LiveActivityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivityService.swift; sourceTree = "<group>"; };
 		49E51DC84AC189169AA2B578 /* AutomationGuideView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomationGuideView.swift; sourceTree = "<group>"; };
+		50C94F40E45159B5A8C5F362 /* LiveActivityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivityService.swift; sourceTree = "<group>"; };
 		54190311121D252F9EC85526 /* DiagnosticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsView.swift; sourceTree = "<group>"; };
 		5903829530722AF20F4AADAA /* WorkModeIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkModeIntents.swift; sourceTree = "<group>"; };
 		5CEEE9422000F413A5D4E275 /* DeviceActivityMonitorExtension.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = DeviceActivityMonitorExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -155,6 +164,7 @@
 		B3D7BE17993D33A8BEC2635B /* BreakDurations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BreakDurations.swift; sourceTree = "<group>"; };
 		B57FDAD8EFABB87845E80A15 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		BE03A328BF0BD61C7FE920F8 /* VoyageFocusWidgetBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoyageFocusWidgetBundle.swift; sourceTree = "<group>"; };
+		C410CD528D621608BB7AD044 /* BreakControlIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BreakControlIntents.swift; sourceTree = "<group>"; };
 		C71634D10535DE5A29F33585 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		CBDD2C141E8485BEDAFB8890 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		DF00739A50E8874FD176CE46 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
@@ -260,8 +270,10 @@
 			children = (
 				9F714C9122D9EB1CE47C533A /* AppGroup.swift */,
 				ECA041411E7A78ABB22ECD01 /* BreakActivityAttributes.swift */,
+				C410CD528D621608BB7AD044 /* BreakControlIntents.swift */,
 				B3D7BE17993D33A8BEC2635B /* BreakDurations.swift */,
 				92CC9D980632C045A5F45952 /* DeviceActivityNames.swift */,
+				50C94F40E45159B5A8C5F362 /* LiveActivityService.swift */,
 				B02DEAF0625AE987DEDFC4FE /* Models.swift */,
 				E5578A5626CEFD9208D702EE /* PlatformCapabilities.swift */,
 				65469964FAA694A598EEE580 /* SharedStore.swift */,
@@ -350,7 +362,6 @@
 			isa = PBXGroup;
 			children = (
 				FDFACC8D8EF40EBA0F3DAF9E /* AppLaunchService.swift */,
-				49B0EC6457495111F80E493D /* LiveActivityService.swift */,
 				7437D0BC7CEF11F61BA9ED17 /* ScreenTimeService.swift */,
 			);
 			path = Services;
@@ -522,9 +533,11 @@
 			files = (
 				925ED14B4672C03BC9FF4B5A /* AppGroup.swift in Sources */,
 				E365AB3EBCFA11A53C4BECAD /* BreakActivityAttributes.swift in Sources */,
+				C5DD2912ED345F17964904C9 /* BreakControlIntents.swift in Sources */,
 				C683172BCE4296DED5A0ACD6 /* BreakDurations.swift in Sources */,
 				ABB892BD30271B3523363F9B /* BreakLiveActivity.swift in Sources */,
 				E3C20C1B79C553D788F6D32E /* DeviceActivityNames.swift in Sources */,
+				E8F25998473626E6532388DA /* LiveActivityService.swift in Sources */,
 				D9F5AE509257DC4552DA846C /* Models.swift in Sources */,
 				88483DE67EC22938F34812A4 /* PlatformCapabilities.swift in Sources */,
 				38798CC3A92471D28721E76C /* SharedStore.swift in Sources */,
@@ -543,10 +556,11 @@
 				EC992D5E42798F70EAD3FC88 /* AutomationGuideView.swift in Sources */,
 				36707BEF0D4BB3AA7501C2E8 /* BreakActivityAttributes.swift in Sources */,
 				34FC111B710BFB808C0A0E15 /* BreakConfigView.swift in Sources */,
+				8FB107B5FF62B8BE50C13C78 /* BreakControlIntents.swift in Sources */,
 				F18917CD5C85686724FC5BFE /* BreakDurations.swift in Sources */,
 				C1526907C7075C6199FA6758 /* DeviceActivityNames.swift in Sources */,
 				2B6BFC5EA2427F501E16C599 /* DiagnosticsView.swift in Sources */,
-				4FD1E114D04A2F8B755D9EAC /* LiveActivityService.swift in Sources */,
+				45117EF0DD03155B15622605 /* LiveActivityService.swift in Sources */,
 				CD7733574C9ECC3BADAAC159 /* Models.swift in Sources */,
 				03E678524E8116DDE19F9C7B /* OnboardingView.swift in Sources */,
 				55740F63FB22AC02B3D7A711 /* PermissionSetupView.swift in Sources */,
@@ -569,9 +583,11 @@
 			files = (
 				BBC1002397D8690B24364892 /* AppGroup.swift in Sources */,
 				132BCD09F8FC4952D50C4A3A /* BreakActivityAttributes.swift in Sources */,
+				EC62545AA8026F1265AD096C /* BreakControlIntents.swift in Sources */,
 				7CA5D2B03D99CEE953F82497 /* BreakDurations.swift in Sources */,
 				A1E3C7A97D26EA1876EED35F /* DeviceActivityMonitorExtension.swift in Sources */,
 				B958DAABA455A94FCAEF006D /* DeviceActivityNames.swift in Sources */,
+				D1F7CFE6E9F65F9B4BDBF0E0 /* LiveActivityService.swift in Sources */,
 				8E6CF6A2C0251017F8793902 /* Models.swift in Sources */,
 				E57A99240B4BF2FFCDF722E5 /* PlatformCapabilities.swift in Sources */,
 				1E1C9574587406994A4B9F6C /* SharedStore.swift in Sources */,
@@ -585,8 +601,10 @@
 			files = (
 				473EECF2C29B7F8ECAD5B82C /* AppGroup.swift in Sources */,
 				5838D6B94902595D6A93E095 /* BreakActivityAttributes.swift in Sources */,
+				CAD6161BCF33585D58A7B466 /* BreakControlIntents.swift in Sources */,
 				9FE38A42863E0073DD9F7F08 /* BreakDurations.swift in Sources */,
 				089E8F82577DFED7FC4717FA /* DeviceActivityNames.swift in Sources */,
+				720506C921D9A302AF619F4E /* LiveActivityService.swift in Sources */,
 				AF467CC65F57F63AEB384523 /* Models.swift in Sources */,
 				0A8D6DE5A23FCDCD2E009732 /* PlatformCapabilities.swift in Sources */,
 				1E643D20F4FFD4BEE1A1FEFC /* SharedStore.swift in Sources */,
@@ -601,8 +619,10 @@
 			files = (
 				8E062E8204A06120F326857D /* AppGroup.swift in Sources */,
 				8B56CA5A66E40C7769D63143 /* BreakActivityAttributes.swift in Sources */,
+				160EEE79894F6DADF6F448D8 /* BreakControlIntents.swift in Sources */,
 				A2CFDB7B55A6E61652E490DA /* BreakDurations.swift in Sources */,
 				707299E998B5494BD4CB40BA /* DeviceActivityNames.swift in Sources */,
+				71410AA47E99B5981FCC59C3 /* LiveActivityService.swift in Sources */,
 				4B334B4A412FA8F17F898CB6 /* Models.swift in Sources */,
 				3536987157775D5041E6C73A /* PlatformCapabilities.swift in Sources */,
 				AD648CAA9AC1B9AC512535F1 /* SharedStore.swift in Sources */,

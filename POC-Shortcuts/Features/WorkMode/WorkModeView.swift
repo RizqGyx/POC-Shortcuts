@@ -61,11 +61,11 @@ struct WorkModeView: View {
                 if let grant = state.activeGrant, grant.isActive {
                     Section {
                         LabeledContent("Opened from", value: grant.appName)
-                        LabeledContent("Duration", value: "\(grant.durationMinutes) min")
+                        LabeledContent("Duration", value: BreakDurations.label(grant.durationSeconds))
                         LabeledContent("Context", value: grant.contextNote.isEmpty ? "—" : grant.contextNote)
                         LabeledContent("Ends") { Text(grant.expiresAt, style: .relative) }
                         Button("End Break Now", role: .destructive) {
-                            screenTime.revokeExpiredGrant(reason: "ended manually")
+                            screenTime.revokeExpiredGrant(reason: "ended manually", expired: false)
                             state.refresh()
                         }
                     } header: {

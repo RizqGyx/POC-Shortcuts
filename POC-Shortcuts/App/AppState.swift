@@ -33,6 +33,12 @@ final class AppState: ObservableObject {
         isWorkModeActive = SharedStore.isWorkModeActive
         hasOnboarded = SharedStore.hasOnboarded
 
+        // "Start Work" tapped in the Dynamic Island while we were not running.
+        if SharedStore.endBreakRequested {
+            SharedStore.endBreakRequested = false
+            ScreenTimeService.shared.revokeExpiredGrant(reason: "Start Work from Live Activity", expired: false)
+        }
+
         // Backstop for the unreliable DeviceActivity threshold callback.
         if let grant = SharedStore.activeGrant, !grant.isActive {
             ScreenTimeService.shared.revokeExpiredGrant(reason: "foreground expiry check")
@@ -92,6 +98,12 @@ final class AppState: ObservableObject {
         let appName = components?.queryItems?.first(where: { $0.name == "app" })?.value
 
         switch url.host {
+        case "endbreak":
+            // From the Live Activity's "Start Work" button.
+            SharedStore.log("App", "Start Work from the Dynamic Island.")
+            ScreenTimeService.shared.revokeExpiredGrant(reason: "Start Work from Live Activity", expired: false)
+            refresh()
+
         case "break":
             let request = BreakRequest(
                 appName: appName ?? "an app",
@@ -118,14 +130,14 @@ final class AppState: ObservableObject {
     // the *system* re-evaluate, rather than trying to launch the app itself.
 
     /// Phase 1 — persist, lift the shield, start the Live Activity. No app launching here.
-    func commitBreak(request: BreakRequest, minutes: Int, context: String) {
-        let grant = BreakGrant(request: request, durationMinutes: minutes, contextNote: context)
+    func commitBreak(request: BreakRequest, seconds: Int, context: String) {
+        let grant = BreakGrant(request: request, durationSeconds: seconds, contextNote: context)
 
         ScreenTimeService.shared.grantBreak(grant)
         SharedStore.clearPendingRequest()
         SharedStore.log(
             "App",
-            "SAVED break — app: \(grant.appName), duration: \(minutes)m, context: \"\(context)\""
+            "SAVED break — app: \(grant.appName), duration: \(BreakDurations.label(seconds)), context: \"\(context)\""
         )
 
         activeGrant = grant

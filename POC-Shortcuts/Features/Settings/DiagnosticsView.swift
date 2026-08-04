@@ -109,7 +109,7 @@ struct DiagnosticsView: View {
                 } else {
                     ForEach(SharedStore.grantHistory) { grant in
                         VStack(alignment: .leading) {
-                            Text("\(grant.appName) — \(grant.durationMinutes) min")
+                            Text("\(grant.appName) — \(BreakDurations.label(grant.durationSeconds))")
                                 .font(.subheadline)
                             Text(grant.contextNote.isEmpty ? "no context" : grant.contextNote)
                                 .font(.caption)

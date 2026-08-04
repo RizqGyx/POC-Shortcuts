@@ -19,6 +19,8 @@ enum SharedStore {
         static let hasOnboarded      = "hasOnboarded"
         static let pendingBounce     = "pendingBounceAppName"
         static let lastShielded      = "lastShieldedApp"
+        static let breakEnded        = "breakEndedInfo"
+        static let endBreakRequested = "endBreakRequested"
     }
 
     private static let encoder = JSONEncoder()
@@ -101,6 +103,25 @@ enum SharedStore {
     static var lastShieldedApp: ShieldedAppInfo? {
         get { read(Key.lastShielded) }
         set { write(newValue, Key.lastShielded) }
+    }
+
+    // MARK: - "A break just ended"
+    //
+    // Set by the monitor extension when a break is used up, and read by both shield
+    // extensions so the block screen can say "your break is over" instead of repeating
+    // "you're trying to open X". Cleared as soon as a new break is granted.
+
+    static var breakEnded: BreakEndedInfo? {
+        get { read(Key.breakEnded) }
+        set { write(newValue, Key.breakEnded) }
+    }
+
+    /// Set by the Live Activity's "Start Work" button; consumed by the app on next
+    /// foreground. The widget extension cannot re-apply a shield itself — that needs the
+    /// Family Controls entitlement — so it leaves a request instead.
+    static var endBreakRequested: Bool {
+        get { AppGroup.defaults.bool(forKey: Key.endBreakRequested) }
+        set { AppGroup.defaults.set(newValue, forKey: Key.endBreakRequested) }
     }
 
     // MARK: - Work mode

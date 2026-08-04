@@ -3,6 +3,7 @@ import Combine
 import FamilyControls
 import ManagedSettings
 import DeviceActivity
+import UserNotifications
 
 /// Wraps the three Screen Time frameworks.
 ///
@@ -134,15 +135,20 @@ final class ScreenTimeService: ObservableObject {
     ///
     /// Two sources:
     ///
-    /// 1. **`selection.applications`** — the picker's own `Application` values. Observed to
-    ///    return nil names on device even with data access granted, so it contributes
-    ///    nothing in practice, but it costs one loop and needs no permission.
-    /// 2. **`FamilyActivityData.installedApplications`** — every installed app, with names,
-    ///    bundle IDs and tokens. This is the one that works.
+    /// 1. **`selection.applications`** — the picker's own `Application` values. Contributes
+    ///    nothing in practice: `localizedDisplayName` and `bundleIdentifier` are both nil
+    ///    here, as they are anywhere outside an extension.
+    /// 2. **`FamilyActivityData.installedApplications`** — every installed app, with tokens
+    ///    and bundle identifiers. This is the one that works.
     ///
-    /// Note what is deliberately *not* required: that the picker's tokens appear in source 2.
-    /// They do not — the two APIs issue different token values for the same app. Requiring
-    /// that intersection made the catalogue look empty when it was in fact complete.
+    /// `localizedDisplayName` is nil even in source 2, so a bundle identifier alone has to be
+    /// enough. Requiring a name as well discarded all 88 usable entries — and, because the
+    /// selection-overlap counter sat after that same guard, it also reported 0/3 overlap and
+    /// suggested the two APIs used different token namespaces. They do not; it is 3/3.
+    ///
+    /// Indexing every installed app rather than only the selected ones is deliberate: the
+    /// token that matters arrives from the *shield* at break time, and a full catalogue makes
+    /// that lookup succeed regardless of which tokens the picker happened to hand back.
     ///
     /// There is no manual fallback. Asking the user to match tokens to apps was both tedious
     /// and unsafe — they could pick YouTube while actually opening Instagram.
@@ -160,6 +166,8 @@ final class ScreenTimeService: ObservableObject {
         guard !tokens.isEmpty else { return 0 }
 
         var linked = 0
+        var catalogueSize = 0
+        var selectionCovered = 0
 
         // Source 1 — straight from the picker's selection.
         for app in selection.applications {
@@ -217,7 +225,8 @@ final class ScreenTimeService: ObservableObject {
 
                 SharedStore.log("App", "Auto-link source 2 (FamilyActivityData): \(installed.count) app(s) — tokens:\(withTokens) names:\(withNames) bundleIDs:\(withBundleIDs) keyable:\(keyable) indexed:\(indexed).")
                 SharedStore.log("App", "Selection tokens also present in that catalogue: \(matchedSelection)/\(tokens.count) — if 0, the picker and FamilyActivityData use different token values.")
-                linked = max(linked, indexed)
+                catalogueSize = indexed
+                selectionCovered = matchedSelection
                 lastError = nil
             } catch {
                 lastError = explain(error)
@@ -225,9 +234,9 @@ final class ScreenTimeService: ObservableObject {
             }
         }
 
-        SharedStore.log("App", "Auto-link result: \(linked) of \(tokens.count) selected app(s) identified.")
+        SharedStore.log("App", "Auto-link result: catalogue \(catalogueSize) app(s); \(selectionCovered)/\(tokens.count) selected app(s) resolvable.")
         objectWillChange.send()
-        return linked
+        return catalogueSize
     }
 
     /// `FamilyActivityData` talks to `com.apple.ManagedSettingsAgent` over XPC, and that
@@ -358,6 +367,7 @@ final class ScreenTimeService: ObservableObject {
     func startWorkMode() {
         SharedStore.isWorkModeActive = true
         SharedStore.clearActiveGrant()
+        SharedStore.breakEnded = nil
         applyShield()
         SharedStore.log("App", "Work Mode STARTED — \(selection.applicationTokens.count) app(s) shielded.")
     }
@@ -365,7 +375,8 @@ final class ScreenTimeService: ObservableObject {
     func endWorkMode() {
         SharedStore.isWorkModeActive = false
         SharedStore.clearActiveGrant()
-        LiveActivityService.end()
+        SharedStore.breakEnded = nil
+        LiveActivityService.end(from: "App")
         clearShield()
         center.stopMonitoring([.breakWindow])
         SharedStore.log("App", "Work Mode ENDED — all shields removed.")
@@ -394,38 +405,100 @@ final class ScreenTimeService: ObservableObject {
     @discardableResult
     func grantBreak(_ grant: BreakGrant) -> Bool {
         SharedStore.activeGrant = grant
+        SharedStore.breakEnded = nil   // a new break supersedes the "break's over" shield
 
         clearShield()
 
         let tokens = selection.applicationTokens
-        SharedStore.log("App", "Break granted — ALL \(tokens.count) shielded app(s) unlocked for \(grant.durationMinutes) min.")
+        SharedStore.log("App", "Break granted — ALL \(tokens.count) shielded app(s) unlocked for \(BreakDurations.label(grant.durationSeconds)).")
+
+        scheduleExpiryNotification(for: grant)
 
         guard !tokens.isEmpty else { return false }
-        armReshield(tokens: tokens, minutes: grant.durationMinutes)
+        armReshield(tokens: tokens, seconds: grant.durationSeconds, endsAt: grant.expiresAt)
         return true
     }
+
+    /// A plain local notification timed to the break's expiry.
+    ///
+    /// Scheduled by the app at grant time, so unlike everything else in this file it does not
+    /// depend on `DeviceActivityMonitor` running, on shield caching, or on a Live Activity
+    /// being reachable from another process. `UNTimeIntervalNotificationTrigger` fires on its
+    /// own. Tapping it opens Voyage Focus, which then re-applies the shield and clears the
+    /// countdown — the one path that is guaranteed to close the loop.
+    private func scheduleExpiryNotification(for grant: BreakGrant) {
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: [Self.expiryNotificationID])
+
+        let content = UNMutableNotificationContent()
+        content.title = "Break's over"
+        content.body = "Your \(BreakDurations.label(grant.durationSeconds)) break on \(grant.appName) has ended. Tap to get back to work."
+        content.sound = .default
+        content.userInfo = ["source": "breakExpiry"]
+
+        let request = UNNotificationRequest(
+            identifier: Self.expiryNotificationID,
+            content: content,
+            trigger: UNTimeIntervalNotificationTrigger(
+                timeInterval: max(1, grant.expiresAt.timeIntervalSinceNow),
+                repeats: false
+            )
+        )
+        center.add(request)
+        SharedStore.log("App", "Expiry notification scheduled for \(BreakDurations.label(grant.durationSeconds)) from now.")
+    }
+
+    private static let expiryNotificationID = "voyagefocus.break.expiry"
 
     /// Arms the re-block. This is the honest weak point of the architecture: threshold
     /// callbacks are the least reliable part of the Screen Time stack, so `AppState`
     /// also re-checks expiry every time the app comes to the foreground.
-    private func armReshield(tokens: Set<ApplicationToken>, minutes: Int) {
+    private func armReshield(tokens: Set<ApplicationToken>, seconds: Int, endsAt: Date) {
         center.stopMonitoring([.breakWindow])
 
-        let schedule = DeviceActivitySchedule(
-            intervalStart: DateComponents(hour: 0, minute: 0),
-            intervalEnd: DateComponents(hour: 23, minute: 59),
-            repeats: true
-        )
-        // Combined usage across every unlocked app — the break is spent no matter which
-        // one it was spent in.
-        let event = DeviceActivityEvent(
-            applications: tokens,
-            threshold: DateComponents(minute: minutes)
+        // Two independent triggers, because they measure different things and the user only
+        // ever sees one of them:
+        //
+        // * The **schedule** ends at the break's wall-clock expiry, which is exactly what the
+        //   Dynamic Island counts down to. `intervalDidEnd` fires there even if the phone is
+        //   sitting in Instagram.
+        // * The **usage event** fires earlier if the whole break is spent inside the unlocked
+        //   apps without interruption.
+        //
+        // Previously only the usage event was armed. Wall-clock time would run out, the
+        // countdown would hit zero, and nothing happened — because the user had switched
+        // apps often enough that measured *usage* never reached the threshold.
+        //
+        // The window *begins* at the break's expiry and runs the 15-minute minimum from
+        // there, so `intervalDidStart` is the wall-clock trigger. Anchoring the window's end
+        // to the expiry instead meant registering an interval that had already started, and
+        // that callback never arrived.
+        let calendar = Calendar.current
+        let startComponents = calendar.dateComponents([.hour, .minute, .second], from: endsAt)
+        let endComponents = calendar.dateComponents(
+            [.hour, .minute, .second],
+            from: endsAt.addingTimeInterval(15 * 60)
         )
 
+        let schedule = DeviceActivitySchedule(
+            intervalStart: startComponents,
+            intervalEnd: endComponents,
+            repeats: false
+        )
+        // Combined usage across every unlocked app — the break is spent no matter which one
+        // it was spent in. Thresholds are whole minutes, so anything shorter than that can
+        // only be caught by the wall-clock trigger above.
+        let thresholdMinutes = seconds / 60
+        let events: [DeviceActivityEvent.Name: DeviceActivityEvent] = thresholdMinutes >= 1
+            ? [.breakUsageLimit: DeviceActivityEvent(
+                applications: tokens,
+                threshold: DateComponents(minute: thresholdMinutes)
+              )]
+            : [:]
+
         do {
-            try center.startMonitoring(.breakWindow, during: schedule, events: [.breakUsageLimit: event])
-            SharedStore.log("App", "Armed re-shield after \(minutes) min of usage.")
+            try center.startMonitoring(.breakWindow, during: schedule, events: events)
+            SharedStore.log("App", "Armed re-shield — fires at \(startComponents.hour ?? 0):\(String(format: "%02d", startComponents.minute ?? 0)):\(String(format: "%02d", startComponents.second ?? 0))\(events.isEmpty ? " (wall clock only — break is under a minute)" : ", or after \(thresholdMinutes) min of usage").")
         } catch {
             lastError = "Could not arm re-shield: \(error.localizedDescription)"
             SharedStore.log("App", "startMonitoring FAILED: \(error)")
@@ -433,10 +506,20 @@ final class ScreenTimeService: ObservableObject {
     }
 
     /// Called when a grant expires, either via the monitor extension or the foreground check.
-    func revokeExpiredGrant(reason: String) {
-        guard SharedStore.activeGrant != nil else { return }
+    /// - Parameter expired: `true` when the break ran out on its own, `false` when the user
+    ///   ended it deliberately. Only the former should raise the "break's over" shield.
+    func revokeExpiredGrant(reason: String, expired: Bool = true) {
+        guard let grant = SharedStore.activeGrant else { return }
+        if expired {
+            SharedStore.breakEnded = BreakEndedInfo(
+                appName: grant.appName,
+                durationSeconds: grant.durationSeconds
+            )
+        }
         SharedStore.clearActiveGrant()
-        LiveActivityService.end()
+        UNUserNotificationCenter.current()
+            .removePendingNotificationRequests(withIdentifiers: [Self.expiryNotificationID])
+        LiveActivityService.end(from: "App")
         center.stopMonitoring([.breakWindow])
         if SharedStore.isWorkModeActive {
             applyShield()

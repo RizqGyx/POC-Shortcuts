@@ -25,7 +25,7 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
     /// no way to leave a note for the app either. The shield's own subtitle is the one
     /// channel that always works, so it doubles as the diagnostic surface. Set to `false`
     /// once the answer is known.
-    private static let showDiagnostics = true
+    private static let showDiagnostics = false
 
     override func configuration(shielding application: Application) -> ShieldConfiguration {
         shield(for: capture(application), application: application)
@@ -79,38 +79,35 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         let group = AppGroup.isShared ? "group:ok" : "group:FAIL"
         let displayName = application?.localizedDisplayName.map { "name:\($0)" } ?? "name:nil"
         let bundle = application?.bundleIdentifier.map { "id:\($0)" } ?? "id:nil"
-        let token = application?.token == nil ? "token:nil" : "token:ok"
-        return "\(group) · \(displayName) · \(bundle) · \(token)"
+        let ended = SharedStore.breakEnded == nil ? "ended:nil" : "ended:set"
+        return "\(group) · \(ended) · \(displayName) · \(bundle)"
     }
 
     private func shield(for name: String, application: Application? = nil) -> ShieldConfiguration {
         let blur: UIBlurEffect.Style = .systemUltraThinMaterialDark
         let background = UIColor.black.withAlphaComponent(0.55)
         let icon = UIImage(systemName: "sailboat.fill")
-        let title = ShieldConfiguration.Label(text: "Voyage Focus", color: .white)
+        // Deliberately one design.
+        //
+        // A "break's over" variant was tried and removed: iOS caches the rendered shield, so
+        // it kept showing the original text after the flag changed, while ShieldAction acted
+        // on the new value. The two disagreed and the button misbehaved. Anything that has to
+        // change in response to state belongs in the Live Activity.
         var subtitleText = "Work Mode is on.\nYou're trying to open \(name)."
         if Self.showDiagnostics {
             subtitleText += "\n\n\(diagnosticLine(application))"
         }
-        let subtitle = ShieldConfiguration.Label(
-            text: subtitleText,
-            color: UIColor.white.withAlphaComponent(0.85)
-        )
-        let primary = ShieldConfiguration.Label(text: "Take a break", color: .black)
 
-        // One button. "Take a break" opens Voyage Focus, where the duration and the context
-        // note are collected, and the blocked app is reopened after Save.
-        //
-        // The iOS 26.4 submenu (`secondaryButtonSubmenuItems`) is deliberately not used: it
-        // grants a break from inside this extension, which means no context note and no
-        // Live Activity, and it is a second way of doing the same thing.
         return ShieldConfiguration(
             backgroundBlurStyle: blur,
             backgroundColor: background,
             icon: icon,
-            title: title,
-            subtitle: subtitle,
-            primaryButtonLabel: primary,
+            title: ShieldConfiguration.Label(text: "Voyage Focus", color: .white),
+            subtitle: ShieldConfiguration.Label(
+                text: subtitleText,
+                color: UIColor.white.withAlphaComponent(0.85)
+            ),
+            primaryButtonLabel: ShieldConfiguration.Label(text: "Take a break", color: .black),
             primaryButtonBackgroundColor: .white
         )
     }
