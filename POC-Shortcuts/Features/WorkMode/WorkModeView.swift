@@ -41,12 +41,11 @@ struct WorkModeView: View {
                                 Text(started, style: .relative)
                             }
                         }
-                        LabeledContent("Shielded apps") {
+                        LabeledContent("Shielded") {
                             if onBreak {
-                                Text("0 of \(screenTime.selectedAppCount) — all unlocked")
-                                    .foregroundStyle(.orange)
+                                Text("none — all unlocked").foregroundStyle(.orange)
                             } else {
-                                Text("\(screenTime.selectedAppCount)")
+                                Text(screenTime.selectionSummary)
                             }
                         }
                     } else {
@@ -160,7 +159,11 @@ struct WorkModeView: View {
                 }
             }
             .navigationTitle("Voyage Focus")
-            .familyActivityPicker(isPresented: $showPicker, selection: $screenTime.selection)
+            .familyActivityPicker(
+                    headerText: "Pick Social, Games and Entertainment — or individual apps.",
+                isPresented: $showPicker,
+                selection: $screenTime.selection
+            )
             .onChange(of: showPicker) { _, isShowing in
                 if !isShowing { screenTime.persistSelection() }
             }

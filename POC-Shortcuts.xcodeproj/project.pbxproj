@@ -76,6 +76,7 @@
 		E3C20C1B79C553D788F6D32E /* DeviceActivityNames.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92CC9D980632C045A5F45952 /* DeviceActivityNames.swift */; };
 		E57A99240B4BF2FFCDF722E5 /* PlatformCapabilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5578A5626CEFD9208D702EE /* PlatformCapabilities.swift */; };
 		E8F25998473626E6532388DA /* LiveActivityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C94F40E45159B5A8C5F362 /* LiveActivityService.swift */; };
+		E94E8CE61F6DD22699CD52AD /* Media.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5DEC5A94EA0619EE4C6250DD /* Media.xcassets */; };
 		EC62545AA8026F1265AD096C /* BreakControlIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = C410CD528D621608BB7AD044 /* BreakControlIntents.swift */; };
 		EC992D5E42798F70EAD3FC88 /* AutomationGuideView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49E51DC84AC189169AA2B578 /* AutomationGuideView.swift */; };
 		F18917CD5C85686724FC5BFE /* BreakDurations.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3D7BE17993D33A8BEC2635B /* BreakDurations.swift */; };
@@ -142,6 +143,7 @@
 		54190311121D252F9EC85526 /* DiagnosticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsView.swift; sourceTree = "<group>"; };
 		5903829530722AF20F4AADAA /* WorkModeIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkModeIntents.swift; sourceTree = "<group>"; };
 		5CEEE9422000F413A5D4E275 /* DeviceActivityMonitorExtension.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = DeviceActivityMonitorExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		5DEC5A94EA0619EE4C6250DD /* Media.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Media.xcassets; sourceTree = "<group>"; };
 		5E9600475555EB9D0F970C35 /* ShieldActionExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ShieldActionExtension.entitlements; sourceTree = "<group>"; };
 		62BCE335C72A072664B04FA0 /* VoyageFocusApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoyageFocusApp.swift; sourceTree = "<group>"; };
 		65469964FAA694A598EEE580 /* SharedStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedStore.swift; sourceTree = "<group>"; };
@@ -296,6 +298,7 @@
 			isa = PBXGroup;
 			children = (
 				73B4E8231821BB48A60426F3 /* Info.plist */,
+				5DEC5A94EA0619EE4C6250DD /* Media.xcassets */,
 				FE98D7FA56B8911A10107F38 /* ShieldConfigurationExtension.entitlements */,
 				F07771A74FC60C9FEE7F0E8A /* ShieldConfigurationExtension.swift */,
 			);
@@ -449,6 +452,7 @@
 			buildConfigurationList = 338456049BF1D27FC254806A /* Build configuration list for PBXNativeTarget "ShieldConfigurationExtension" */;
 			buildPhases = (
 				B50AAF02D520A1E85FA59B7F /* Sources */,
+				BDD984C4CCE3863E76DF0BAC /* Resources */,
 			);
 			buildRules = (
 			);
@@ -521,6 +525,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				91F2B2FFCB72BBE6960D594B /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BDD984C4CCE3863E76DF0BAC /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E94E8CE61F6DD22699CD52AD /* Media.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

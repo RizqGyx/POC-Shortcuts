@@ -33,10 +33,10 @@ final class AppState: ObservableObject {
         isWorkModeActive = SharedStore.isWorkModeActive
         hasOnboarded = SharedStore.hasOnboarded
 
-        // "Start Work" tapped in the Dynamic Island while we were not running.
+        // "Start Work" tapped while we were not running.
         if SharedStore.endBreakRequested {
             SharedStore.endBreakRequested = false
-            ScreenTimeService.shared.revokeExpiredGrant(reason: "Start Work from Live Activity", expired: false)
+            ScreenTimeService.shared.resumeWork(reason: "queued Start Work request")
         }
 
         // Backstop for the unreliable DeviceActivity threshold callback.
@@ -90,7 +90,11 @@ final class AppState: ObservableObject {
         _ = await AppLaunchService.open(appNamed: appName)
     }
 
-    // MARK: - Deep link:  voyagefocus://break?app=Instagram
+    // MARK: - Deep links
+    //
+    //   voyagefocus://startwork          apply the shield (from the Live Activity)
+    //   voyagefocus://newbreak           pick another break duration
+    //   voyagefocus://break?app=Instagram  open the break screen for a named app
 
     func handle(url: URL) {
         guard url.scheme == AppGroup.urlScheme else { return }
@@ -98,10 +102,22 @@ final class AppState: ObservableObject {
         let appName = components?.queryItems?.first(where: { $0.name == "app" })?.value
 
         switch url.host {
-        case "endbreak":
-            // From the Live Activity's "Start Work" button.
+        case "startwork", "endbreak":
+            // "Start Work" in the Live Activity. This is now the only thing that applies the
+            // shield after a break — nothing blocks automatically at expiry.
             SharedStore.log("App", "Start Work from the Dynamic Island.")
-            ScreenTimeService.shared.revokeExpiredGrant(reason: "Start Work from Live Activity", expired: false)
+            ScreenTimeService.shared.resumeWork(reason: "Start Work from Live Activity")
+            refresh()
+
+        case "newbreak":
+            // "New Break" — go straight to picking a duration for another one.
+            let name = SharedStore.breakEnded?.appName
+                ?? SharedStore.grantHistory.first?.appName
+                ?? "an app"
+            SharedStore.breakEnded = nil
+            LiveActivityService.end(from: "App")
+            SharedStore.pendingRequest = BreakRequest(appName: name, source: .manual)
+            SharedStore.log("App", "New break requested from the Dynamic Island for \"\(name)\".")
             refresh()
 
         case "break":

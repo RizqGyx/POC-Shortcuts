@@ -4,20 +4,18 @@ import FamilyControls
 import ManagedSettings
 import UserNotifications
 
-/// [PARTIALLY POSSIBLE] Puts the shield back when a break is used up.
+/// Notices when a break has run out.
 ///
-/// This exists because iOS gives a third-party app no way to run a background timer. You
-/// cannot say "re-block Instagram in 10 minutes" — the app will not be running. The only
-/// supported mechanism is to ask DeviceActivity to call you back, either at the end of a
-/// schedule interval or when a usage threshold is crossed.
+/// This exists because iOS gives a third-party app no way to run a background timer — you
+/// cannot say "call me in 10 minutes". DeviceActivity's callbacks are the only mechanism.
 ///
-/// We use a threshold event: the shield returns after the user has actually *used* the
-/// app for the granted duration.
+/// It no longer re-applies the shield itself. A block appearing mid-scroll with no warning
+/// was unpleasant, so expiry only records that the break is over and alerts; the user then
+/// picks "Start Work" or "New Break" from the Live Activity.
 ///
-/// Honest caveat: threshold callbacks are the least reliable part of the Screen Time
-/// stack, with open bug reports about delayed and missed firings on recent iOS versions.
-/// `AppState` therefore also checks for expiry whenever the app is foregrounded, and the
-/// Diagnostics screen records which of the two actually fired so you can measure it.
+/// Note the extension cannot touch the Live Activity: measured on device,
+/// `Activity.activities` is empty here, so any update or end call is a silent no-op. The
+/// widget's own `staleDate` handling covers the visual change instead.
 class DeviceActivityMonitorExtension: DeviceActivityMonitor {
 
     private let store = ManagedSettingsStore(named: .voyageFocus)
@@ -37,7 +35,7 @@ class DeviceActivityMonitorExtension: DeviceActivityMonitor {
             return
         }
 
-        SharedStore.log("DeviceActivityMonitor", "\(reason) for \"\(grant.appName)\" — re-applying shield.")
+        SharedStore.log("DeviceActivityMonitor", "\(reason) for \"\(grant.appName)\".")
 
         // Marker for the next shield: it greets the user with "break's over" and the choice
         // between going back to work and taking another one.
@@ -47,9 +45,13 @@ class DeviceActivityMonitorExtension: DeviceActivityMonitor {
         )
 
         SharedStore.clearActiveGrant()
-        LiveActivityService.end(from: "DeviceActivityMonitor")
-        reapplyShield()
         DeviceActivityCenter().stopMonitoring([.breakWindow])
+
+        // Deliberately no re-shield here. A block landing mid-scroll with no warning is
+        // jarring, so the apps stay open and the Live Activity asks the user to choose:
+        // "Start Work" applies the shield, "New Break" opens the app to pick another
+        // duration. Until then nothing changes underneath them.
+        SharedStore.log("DeviceActivityMonitor", "Apps left open — waiting for the user to choose.")
 
         notifyBreakOver(appName: grant.appName, seconds: grant.durationSeconds)
     }
@@ -61,8 +63,8 @@ class DeviceActivityMonitorExtension: DeviceActivityMonitor {
         let content = UNMutableNotificationContent()
         content.title = "Break's over"
         content.body = seconds > 0
-            ? "Your \(BreakDurations.label(seconds)) break on \(appName) has ended. \(appName) is blocked again."
-            : "\(appName) is blocked again."
+            ? "Your \(BreakDurations.label(seconds)) break on \(appName) has ended. Back to work, or take another?"
+            : "Your break on \(appName) has ended. Back to work, or take another?"
         content.sound = .default
         content.userInfo = ["source": "breakEnded", "appName": appName]
 
@@ -92,25 +94,4 @@ class DeviceActivityMonitorExtension: DeviceActivityMonitor {
         endBreak(reason: "monitoring window closed")
     }
 
-    /// Re-reads the user's selection from the App Group. The extension has no access to
-    /// the app's in-memory state, so this is the only source of truth available to it.
-    private func reapplyShield() {
-        guard SharedStore.isWorkModeActive else {
-            SharedStore.log("DeviceActivityMonitor", "Work Mode is off — leaving shields down.")
-            return
-        }
-        guard let data = SharedStore.selectionData,
-              let selection = try? JSONDecoder().decode(FamilyActivitySelection.self, from: data)
-        else {
-            SharedStore.log("DeviceActivityMonitor", "No stored selection — nothing to re-shield.")
-            return
-        }
-
-        let tokens = selection.applicationTokens
-        store.shield.applications = tokens.isEmpty ? nil : tokens
-        store.shield.applicationCategories = selection.categoryTokens.isEmpty
-            ? nil
-            : .specific(selection.categoryTokens)
-        SharedStore.log("DeviceActivityMonitor", "Re-shielded \(tokens.count) app(s).")
-    }
 }

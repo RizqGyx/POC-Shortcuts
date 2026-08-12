@@ -49,14 +49,17 @@ struct BreakLiveActivity: Widget {
                 }
 
                 DynamicIslandExpandedRegion(.trailing) {
-                    Button(intent: DismissBreakActivityIntent()) {
-                        Image(systemName: "xmark")
+                    // A Link, not Button(intent:). The intent button rendered but never
+                    // fired on device inside an expanded region, and `Shared/` compiling
+                    // into both app and widget gives the intent two module-qualified types
+                    // besides. A URL sidesteps both problems.
+                    Link(destination: URL(string: "\(AppGroup.urlScheme)://newbreak")!) {
+                        Image(systemName: isOver(context) ? "hourglass" : "xmark")
                             .font(.title3)
                             .foregroundStyle(.white)
                             .frame(width: 48, height: 48)
-                            .background(.gray, in: Circle())
+                            .background(isOver(context) ? Color.blue : Color.gray, in: Circle())
                     }
-                    .buttonStyle(.plain)
                     .padding(.trailing, 4)
                 }
 

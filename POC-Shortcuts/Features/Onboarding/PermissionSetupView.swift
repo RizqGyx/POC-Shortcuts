@@ -22,7 +22,7 @@ struct PermissionSetupView: View {
     private var authorized: Bool { screenTime.isAuthorized }
     /// Linking is part of being ready, not an optional extra. If a token has no identity,
     /// the break flow cannot reopen that app and the user hits a dead end mid-break.
-    private var ready: Bool { authorized && screenTime.selectedAppCount > 0 }
+    private var ready: Bool { authorized && screenTime.hasSelection }
 
     var body: some View {
         Form {
@@ -66,8 +66,8 @@ struct PermissionSetupView: View {
                 Button("Choose Distracting Apps") { showPicker = true }
                     .disabled(!authorized)
                 LabeledContent("Selected") {
-                    Text("\(screenTime.selectedAppCount) app(s)")
-                        .foregroundStyle(screenTime.selectedAppCount > 0 ? .green : .secondary)
+                    Text(screenTime.selectionSummary)
+                        .foregroundStyle(screenTime.hasSelection ? .green : .secondary)
                 }
             } header: {
                 HStack {
@@ -76,7 +76,14 @@ struct PermissionSetupView: View {
                     CapabilityBadge(capability: .real)
                 }
             } footer: {
-                Text("Apple's own picker. That's the whole setup — Voyage Focus works out app identities on its own from here.")
+                Text("""
+                Apple's own picker, and its category list is fixed — FamilyActivityPicker \
+                takes a title and header text and nothing else, so an app cannot narrow it to \
+                Social, Games and Entertainment. Pick those three and ignore the rest.
+
+                Choosing a whole category selects no individual apps, which is why the count \
+                above reports categories separately.
+                """)
             }
 
             // 3 ── automatic, nothing for the user to do ──────────────────
@@ -232,7 +239,12 @@ struct PermissionSetupView: View {
         }
         .navigationTitle("Setup")
         .navigationBarTitleDisplayMode(.inline)
-        .familyActivityPicker(isPresented: $showPicker, selection: $screenTime.selection)
+        .familyActivityPicker(
+            headerText: "Pick Social, Games and Entertainment — or individual apps.",
+            footerText: "Other categories work too, but these three are what Voyage Focus is designed around.",
+            isPresented: $showPicker,
+            selection: $screenTime.selection
+        )
         .onChange(of: showPicker) { _, isShowing in
             guard !isShowing else { return }
             screenTime.persistSelection()

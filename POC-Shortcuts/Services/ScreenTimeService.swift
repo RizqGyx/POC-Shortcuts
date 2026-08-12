@@ -81,7 +81,7 @@ final class ScreenTimeService: ObservableObject {
     /// insisting on them reported failure while everything needed was already in place.
     var detectionState: DetectionState {
         guard #available(iOS 26.4, *) else { return .unsupportedOS }
-        guard selectedAppCount > 0 else { return .noAppsSelected }
+        guard hasSelection else { return .noAppsSelected }
         let catalogue = SharedStore.tokenInfo.count
         return catalogue > 0 ? .ready(linked: catalogue) : .needsDataAccess
     }
@@ -327,6 +327,22 @@ final class ScreenTimeService: ObservableObject {
     // MARK: - Selection  [REAL]
 
     var selectedAppCount: Int { selection.applicationTokens.count }
+    var selectedCategoryCount: Int { selection.categoryTokens.count }
+
+    /// Picking a whole category yields category tokens and **no** application tokens, so a
+    /// count based on apps alone read "0 app(s)" while the shield was in fact covering
+    /// everything in that category.
+    var hasSelection: Bool { selectedAppCount > 0 || selectedCategoryCount > 0 }
+
+    var selectionSummary: String {
+        switch (selectedAppCount, selectedCategoryCount) {
+        case (0, 0):            return "nothing selected"
+        case (let apps, 0):     return "\(apps) app(s)"
+        case (0, let cats):     return "\(cats) categor\(cats == 1 ? "y" : "ies")"
+        case (let apps, let cats):
+            return "\(apps) app(s) + \(cats) categor\(cats == 1 ? "y" : "ies")"
+        }
+    }
 
     /// Blocked apps with no identity at all, so nothing can be derived for reopening them.
     /// An app that is named but absent from the scheme catalog does not count here — a
@@ -506,8 +522,22 @@ final class ScreenTimeService: ObservableObject {
     }
 
     /// Called when a grant expires, either via the monitor extension or the foreground check.
+    /// Resumes blocking. Called when the user picks "Start Work" — never automatically.
+    func resumeWork(reason: String) {
+        SharedStore.breakEnded = nil
+        SharedStore.clearActiveGrant()
+        LiveActivityService.end(from: "App")
+        if SharedStore.isWorkModeActive { applyShield() }
+        center.stopMonitoring([.breakWindow])
+        SharedStore.log("App", "Work resumed (\(reason)) — shield applied.")
+    }
+
     /// - Parameter expired: `true` when the break ran out on its own, `false` when the user
-    ///   ended it deliberately. Only the former should raise the "break's over" shield.
+    ///   ended it deliberately.
+    ///
+    /// An expired break deliberately does **not** re-apply the shield. The apps stay open
+    /// until the user chooses "Start Work" or starts another break, so a block never lands
+    /// mid-scroll without warning.
     func revokeExpiredGrant(reason: String, expired: Bool = true) {
         guard let grant = SharedStore.activeGrant else { return }
         if expired {
@@ -519,11 +549,16 @@ final class ScreenTimeService: ObservableObject {
         SharedStore.clearActiveGrant()
         UNUserNotificationCenter.current()
             .removePendingNotificationRequests(withIdentifiers: [Self.expiryNotificationID])
-        LiveActivityService.end(from: "App")
         center.stopMonitoring([.breakWindow])
-        if SharedStore.isWorkModeActive {
-            applyShield()
-            SharedStore.log("App", "Break expired (\(reason)) — shield RE-APPLIED.")
+
+        if expired {
+            SharedStore.log("App", "Break expired (\(reason)) — apps left open, waiting for the user to choose.")
+        } else {
+            LiveActivityService.end(from: "App")
+            if SharedStore.isWorkModeActive {
+                applyShield()
+                SharedStore.log("App", "Break ended (\(reason)) — shield applied.")
+            }
         }
     }
 }

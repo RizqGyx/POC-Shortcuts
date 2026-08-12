@@ -74,6 +74,26 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
         return name
     }
 
+    // MARK: - Icon
+
+    /// The shield's icon is a plain `UIImage?`, so any artwork works — drop a PNG or PDF
+    /// named `ShieldIcon` into `Media.xcassets` **in this extension's target**. It has to be
+    /// in the extension's own bundle, not the app's: this process draws the shield, and it
+    /// cannot read the app's resources.
+    ///
+    /// An animated GIF will not work. `ShieldConfiguration` is a value the system renders
+    /// once into its own UI; there is no view of ours running, no timer, and — as this
+    /// project measured — iOS caches the rendered result and does not redraw it when state
+    /// changes. Even `UIImage.animatedImage(with:duration:)` only carries frames that
+    /// something has to animate, and here nothing does. Static artwork is the whole of what
+    /// the API offers.
+    private static let shieldIcon: UIImage? = {
+        guard let custom = UIImage(named: "ShieldIcon") else {
+            return UIImage(systemName: "sailboat.fill")
+        }
+        return custom.scaledToFit(maxDimension: 120)
+    }()
+
     /// What this process can and cannot see, rendered onto the shield.
     private func diagnosticLine(_ application: Application?) -> String {
         let group = AppGroup.isShared ? "group:ok" : "group:FAIL"
@@ -86,7 +106,7 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
     private func shield(for name: String, application: Application? = nil) -> ShieldConfiguration {
         let blur: UIBlurEffect.Style = .systemUltraThinMaterialDark
         let background = UIColor.black.withAlphaComponent(0.55)
-        let icon = UIImage(systemName: "sailboat.fill")
+        let icon = Self.shieldIcon
         // Deliberately one design.
         //
         // A "break's over" variant was tried and removed: iOS caches the rendered shield, so
@@ -110,5 +130,23 @@ class ShieldConfigurationExtension: ShieldConfigurationDataSource {
             primaryButtonLabel: ShieldConfiguration.Label(text: "Take a break", color: .black),
             primaryButtonBackgroundColor: .white
         )
+    }
+}
+
+private extension UIImage {
+    /// The shield draws its icon at roughly 100pt. A full-resolution asset handed over
+    /// unscaled renders oversized and crops badly, so anything larger is fitted first.
+    func scaledToFit(maxDimension: CGFloat) -> UIImage {
+        let longestSide = max(size.width, size.height)
+        guard longestSide > maxDimension, longestSide > 0 else { return self }
+
+        let ratio = maxDimension / longestSide
+        let target = CGSize(width: size.width * ratio, height: size.height * ratio)
+
+        let format = UIGraphicsImageRendererFormat.default()
+        format.opaque = false
+        return UIGraphicsImageRenderer(size: target, format: format).image { _ in
+            draw(in: CGRect(origin: .zero, size: target))
+        }
     }
 }
